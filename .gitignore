@@ -1,0 +1,63 @@
+# Environment variables & secrets (CRITICAL: NEVER COMMIT)
+.env
+*.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+E_voting/env/
+
+# Node & Frontend dependencies & build
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+**/dist/
+
+# Database dumps & local databases
+*.sqlite3
+*.db
+*.sql
+vote_db_backup.sql
+
+# Biometric & Face Datasets (PII / Biometric Privacy)
+face_auth/dataset/*
+**/face_auth/dataset/*
+!face_auth/dataset/.gitkeep
+face_auth/model/face_model.yml
+**/face_auth/model/face_model.yml
+
+# Static & Media uploads in production
+staticfiles/
+**/staticfiles/
+media/
+**/media/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.zip
+*.7z
+*.tar.gz

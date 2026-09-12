@@ -1,0 +1,29 @@
+# Environment secrets — never commit this
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+env/
+venv/
+.venv/
+
+# Django
+*.sqlite3
+staticfiles/
+media/
+
+# Face model (large binary files)
+face_auth/model/face_model.yml
+
+# OS
+.DS_Store
+Thumbs.db
