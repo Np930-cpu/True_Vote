@@ -1,4 +1,4 @@
-﻿from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.utils import timezone
 from datetime import timedelta
 import random
+from django.conf import settings
 from .models import Voters
 
 
@@ -61,9 +62,9 @@ def send_otp(request):
             pending['otp_created_at'] = timezone.now().isoformat()
             cache.set(f'pending_reg_{voter_id}', pending, timeout=3600)
             send_mail(
-                'TrueVote â€” Email Verification OTP',
+                'TrueVote — Email Verification OTP',
                 f'Your OTP is {otp}. It expires in 2 minutes.',
-                'testfrom54321@gmail.com',
+                settings.EMAIL_HOST_USER,
                 [pending['email_id']],
                 fail_silently=False
             )
@@ -84,9 +85,9 @@ def send_otp(request):
     user.save()
 
     send_mail(
-        'TrueVote â€” Email Verification OTP',
+        'TrueVote — Email Verification OTP',
         f'Your OTP is {otp}. It expires in 2 minutes.',
-        'testfrom54321@gmail.com',
+        settings.EMAIL_HOST_USER,
         [user.email_id],
         fail_silently=False
     )
@@ -214,9 +215,9 @@ def send_login_otp(request):
     user.save()
 
     send_mail(
-        'TrueVote â€” Login OTP',
+        'TrueVote — Login OTP',
         f'Your login OTP is {otp}. It expires in 2 minutes.',
-        'testfrom54321@gmail.com',
+        settings.EMAIL_HOST_USER,
         [user.email_id],
         fail_silently=False
     )
