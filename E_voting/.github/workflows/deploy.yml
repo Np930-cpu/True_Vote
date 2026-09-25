@@ -1,4 +1,4 @@
-```yaml
+
 name: Deploy React Frontend
 
 on:
@@ -55,4 +55,4 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
-```
+
