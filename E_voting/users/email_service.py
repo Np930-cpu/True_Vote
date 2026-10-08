@@ -64,7 +64,7 @@ def send_otp_via_brevo(recipient, otp, subject):
     sender_email = (
         os.environ.get('BREVO_FROM_EMAIL')
         or getattr(settings, 'EMAIL_HOST_USER', '')
-        or 'noreply@truevote.app'
+        or 'nishant.pandey516532@gmail.com'
     )
     sender_name = os.environ.get('BREVO_FROM_NAME', 'TrueVote')
     payload = json.dumps({
@@ -136,16 +136,16 @@ def deliver_otp(recipient_email, otp, subject='TrueVote — Verification OTP'):
     """
     errors = []
 
-    # 1. Resend API
-    if os.environ.get('RESEND_API_KEY') or getattr(settings, 'RESEND_API_KEY', None):
-        success, msg = send_otp_via_resend(recipient_email, otp, subject)
+    # 1. SMTP (Google Gmail - Direct delivery to Primary Inbox, times out in 3s if blocked)
+    if settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD:
+        success, msg = send_otp_via_smtp(recipient_email, otp, subject)
         if success:
-            print(f"[TrueVote] ✅ OTP delivered via Resend API to {recipient_email}")
+            print(f"[TrueVote] ✅ OTP delivered via SMTP to {recipient_email}")
             return True, msg
         errors.append(msg)
-        print(f"[TrueVote] ⚠️ Resend delivery failed to {recipient_email}: {msg}")
+        print(f"[TrueVote] ⚠️ SMTP delivery failed to {recipient_email}: {msg}")
 
-    # 2. Brevo API
+    # 2. Brevo HTTPS API (Works on Render port 443)
     if os.environ.get('BREVO_API_KEY') or getattr(settings, 'BREVO_API_KEY', None):
         success, msg = send_otp_via_brevo(recipient_email, otp, subject)
         if success:
@@ -154,14 +154,14 @@ def deliver_otp(recipient_email, otp, subject='TrueVote — Verification OTP'):
         errors.append(msg)
         print(f"[TrueVote] ⚠️ Brevo delivery failed to {recipient_email}: {msg}")
 
-    # 3. SMTP (Google Gmail / custom SMTP)
-    if settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD:
-        success, msg = send_otp_via_smtp(recipient_email, otp, subject)
+    # 3. Resend HTTPS API (Works on Render port 443)
+    if os.environ.get('RESEND_API_KEY') or getattr(settings, 'RESEND_API_KEY', None):
+        success, msg = send_otp_via_resend(recipient_email, otp, subject)
         if success:
-            print(f"[TrueVote] ✅ OTP delivered via SMTP to {recipient_email}")
+            print(f"[TrueVote] ✅ OTP delivered via Resend API to {recipient_email}")
             return True, msg
         errors.append(msg)
-        print(f"[TrueVote] ⚠️ SMTP delivery failed to {recipient_email}: {msg}")
+        print(f"[TrueVote] ⚠️ Resend delivery failed to {recipient_email}: {msg}")
 
     error_summary = "; ".join(errors) if errors else "No email delivery provider configured"
     print(f"[TrueVote] ❌ Failed to deliver OTP email to {recipient_email}: {error_summary}")
