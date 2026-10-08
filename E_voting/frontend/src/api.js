@@ -1,12 +1,32 @@
 import axios from 'axios';
 
-// Use VITE_API_BASE_URL in production (e.g. on Vercel/Netlify pointing to Render backend)
-// In local development, leave unset so Vite dev server proxies /api and /blockchain to Django
-const rawBaseURL = import.meta.env.VITE_API_BASE_URL || '';
-const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL.slice(0, -1) : rawBaseURL;
-const API = axios.create({ baseURL });
+// Get backend URL from Vite environment or localStorage fallback
+export const getBaseURL = () => {
+  const envUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  const storedUrl = typeof window !== 'undefined' ? (localStorage.getItem('VITE_API_BASE_URL') || '').trim() : '';
+  const chosen = envUrl || storedUrl;
+  return chosen.endsWith('/') ? chosen.slice(0, -1) : chosen;
+};
+
+// Allow updating the backend URL at runtime without needing a frontend rebuild
+export const setBaseURL = (url) => {
+  const clean = (url || '').trim().replace(/\/+$/, '');
+  if (clean) {
+    localStorage.setItem('VITE_API_BASE_URL', clean);
+  } else {
+    localStorage.removeItem('VITE_API_BASE_URL');
+  }
+  API.defaults.baseURL = clean;
+  return clean;
+};
+
+const API = axios.create({ baseURL: getBaseURL() });
 
 API.interceptors.request.use((config) => {
+  const currentBase = getBaseURL();
+  if (currentBase) {
+    config.baseURL = currentBase;
+  }
   const token = localStorage.getItem('admin_access') || localStorage.getItem('access');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;

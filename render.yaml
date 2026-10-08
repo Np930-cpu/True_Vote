@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: E_voting
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate && python manage.py init_admin
-    startCommand: gunicorn E_voting.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: gunicorn E_voting.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: DEBUG
         value: "False"

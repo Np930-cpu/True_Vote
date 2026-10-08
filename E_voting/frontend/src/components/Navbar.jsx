@@ -1,11 +1,18 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
+import { getBaseURL } from '../api';
+import ServerConfigModal from './ServerConfigModal';
 
 export default function Navbar() {
   const { user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+
+  const isDeployed = typeof window !== 'undefined' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1';
 
   const handleLogout = () => { logout(); navigate('/'); setOpen(false); };
 
@@ -32,29 +39,84 @@ export default function Navbar() {
   const links = isAdmin ? adminLinks : user ? voterLinks : guestLinks;
 
   return (
-    <nav>
-      <div className="container nav-inner">
-        <NavLink to="/" className="logo" onClick={() => setOpen(false)}>
-          ✓ True<span>Vote</span>
-        </NavLink>
+    <>
+      {isDeployed && !getBaseURL() && (
+        <div style={{
+          background: 'linear-gradient(90deg, #1e1b4b, #312e81)',
+          color: '#e0e7ff',
+          padding: '0.45rem 1rem',
+          textAlign: 'center',
+          fontSize: '0.85rem',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.75rem',
+          zIndex: 100,
+        }}>
+          <span>⚡ Live Backend not connected yet.</span>
+          <button
+            onClick={() => setShowConfig(true)}
+            style={{
+              background: '#4f46e5',
+              color: '#fff',
+              border: 'none',
+              padding: '0.2rem 0.75rem',
+              borderRadius: '6px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Connect Backend
+          </button>
+        </div>
+      )}
 
-        <ul style={{ display: 'flex' }} className="desktop-nav">
-          {links.map(l => (
-            <li key={l.to}>
-              <NavLink to={l.to}>{l.label}</NavLink>
-            </li>
-          ))}
-          {(user || isAdmin) && (
+      <nav>
+        <div className="container nav-inner">
+          <NavLink to="/" className="logo" onClick={() => setOpen(false)}>
+            ✓ True<span>Vote</span>
+          </NavLink>
+
+          <ul style={{ display: 'flex', alignItems: 'center' }} className="desktop-nav">
+            {links.map(l => (
+              <li key={l.to}>
+                <NavLink to={l.to}>{l.label}</NavLink>
+              </li>
+            ))}
+            {(user || isAdmin) && (
+              <li>
+                <button
+                  onClick={handleLogout}
+                  style={{ color: 'var(--red) !important' }}
+                >
+                  Logout
+                </button>
+              </li>
+            )}
             <li>
               <button
-                onClick={handleLogout}
-                style={{ color: 'var(--red) !important' }}
+                onClick={() => setShowConfig(true)}
+                title="Configure Backend Server URL"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '6px',
+                  padding: '0.3rem 0.6rem',
+                  fontSize: '0.8rem',
+                  color: 'var(--ink2, #aaa)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  marginLeft: '0.5rem',
+                }}
               >
-                Logout
+                <span>⚙️</span> Server
               </button>
             </li>
-          )}
-        </ul>
+          </ul>
 
         <button
           onClick={() => setOpen(o => !o)}
@@ -113,9 +175,12 @@ export default function Navbar() {
       <style>{`
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
-          .hamburger { display: block !important; }
         }
       `}</style>
+      <ServerConfigModal isOpen={showConfig} onClose={() => setShowConfig(false)} />
     </nav>
+  </>
   );
 }
+
+
