@@ -19,6 +19,7 @@ import AdminLogin from './pages/admin/AdminLogin';
 import Dashboard from './pages/admin/Dashboard';
 import ManageElections from './pages/admin/ManageElections';
 import ManageCandidates from './pages/admin/ManageCandidates';
+import ManageVoters from './pages/admin/ManageVoters';
 import AdminBlockchain from './pages/admin/AdminBlockchain';
 
 function VoterRoute({ children }) {
@@ -53,6 +54,7 @@ function AppRoutes() {
         <Route path="/admin/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
         <Route path="/admin/elections" element={<AdminRoute><ManageElections /></AdminRoute>} />
         <Route path="/admin/candidates" element={<AdminRoute><ManageCandidates /></AdminRoute>} />
+        <Route path="/admin/voters" element={<AdminRoute><ManageVoters /></AdminRoute>} />
         <Route path="/admin/blockchain" element={<AdminRoute><AdminBlockchain /></AdminRoute>} />
 
         <Route path="*" element={<Navigate to="/" />} />

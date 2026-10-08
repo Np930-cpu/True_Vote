@@ -7,7 +7,7 @@ const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL.slice(0, -1) : rawBaseURL;
 const API = axios.create({ baseURL });
 
 API.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access');
+  const token = localStorage.getItem('admin_access') || localStorage.getItem('access');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -17,8 +17,9 @@ API.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       const url = error.config?.url || '';
-      if (!url.includes('/login/') && !url.includes('/register/')) {
+      if (!url.includes('/login/') && !url.includes('/register/') && !url.includes('/admin-login/')) {
         localStorage.removeItem('access');
+        localStorage.removeItem('admin_access');
         localStorage.removeItem('refresh');
         localStorage.removeItem('voter');
       }
@@ -38,6 +39,10 @@ export const adminLogin = (data) => API.post('/api/users/admin-login/', data);
 export const forgotPassword = (data) => API.post('/api/users/forgot-password/', data);
 export const resetPassword = (data) => API.post('/api/users/reset-password/', data);
 
+export const listVoters = (params = {}) => API.get('/api/users/voters/', { params });
+export const updateVoter = (voterId, data) => API.patch(`/api/users/voters/${voterId}/`, data);
+export const deleteVoter = (voterId) => API.delete(`/api/users/voters/${voterId}/delete/`);
+
 export const registerFace = (data) => API.post('/api/face/register-face/', data);
 export const saveFaceFrame = (data) => API.post('/api/face/save-frame/', data);
 export const saveFaceFramesBatch = (data) => API.post('/api/face/save-frames-batch/', data);
@@ -46,9 +51,13 @@ export const recognizeFrame = (data) => API.post('/api/face/recognize-frame/', d
 
 export const listElections = (params = {}) => API.get('/api/elections/election/', { params });
 export const createElection = (data) => API.post('/api/elections/election/create/', data);
+export const updateElection = (id, data) => API.patch(`/api/elections/election/${id}/update/`, data);
 export const deleteElection = (id) => API.delete(`/api/elections/election/${id}/delete/`);
+
 export const listCandidates = (electionId) => API.get('/api/elections/candidate/', { params: electionId ? { election: electionId } : {} });
 export const registerCandidate = (data) => API.post('/api/elections/candidate/register/', data);
+export const updateCandidate = (id, data) => API.patch(`/api/elections/candidate/${id}/update/`, data);
+export const deleteCandidate = (id) => API.delete(`/api/elections/candidate/${id}/delete/`);
 
 export const castVote = (data) => API.post('/api/votes/vote/', data);
 export const getResults = (electionId) => API.get(`/api/votes/results/${electionId}/`);

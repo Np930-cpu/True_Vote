@@ -20,6 +20,7 @@ export default function Navbar() {
     { to: '/admin/dashboard', label: 'Dashboard' },
     { to: '/admin/elections', label: 'Elections' },
     { to: '/admin/candidates', label: 'Candidates' },
+    { to: '/admin/voters', label: 'Voters' },
     { to: '/admin/blockchain', label: 'Blockchain' },
   ];
   const guestLinks = [

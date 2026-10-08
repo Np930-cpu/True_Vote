@@ -110,4 +110,56 @@ def list_candidate(request):
     else:
         candidate = Candidate.objects.all()
     serializer = candidateserializer(candidate, many=True)
-    return Response(serializer.data)
+    return Response(serializer.data)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_election(request, election_id):
+    try:
+        election = Election.objects.get(id=election_id)
+    except Election.DoesNotExist:
+        return Response({'error': 'Election not found'}, status=404)
+
+    if election.creator != request.user and not request.user.is_staff and not request.user.is_superuser:
+        return Response({'error': 'Permission denied'}, status=403)
+
+    serializer = electionserializer(election, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'message': 'Election updated successfully', 'election': serializer.data})
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_candidate(request, candidate_id):
+    try:
+        candidate = Candidate.objects.get(id=candidate_id)
+    except Candidate.DoesNotExist:
+        return Response({'error': 'Candidate not found'}, status=404)
+
+    if candidate.election.creator != request.user and not request.user.is_staff and not request.user.is_superuser:
+        return Response({'error': 'Permission denied'}, status=403)
+
+    serializer = candidateserializer(candidate, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'message': 'Candidate updated successfully', 'candidate': serializer.data})
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_candidate(request, candidate_id):
+    try:
+        candidate = Candidate.objects.get(id=candidate_id)
+    except Candidate.DoesNotExist:
+        return Response({'error': 'Candidate not found'}, status=404)
+
+    if candidate.election.creator != request.user and not request.user.is_staff and not request.user.is_superuser:
+        return Response({'error': 'Permission denied'}, status=403)
+
+    candidate.delete()
+    return Response({'message': 'Candidate deleted successfully'})
+

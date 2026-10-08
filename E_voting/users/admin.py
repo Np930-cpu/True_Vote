@@ -34,10 +34,24 @@ class VotersAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        return False
-
-    def has_change_permission(self, request, obj=None):
         return True
+
+    def delete_model(self, request, obj):
+        import os, shutil
+        from django.conf import settings
+        dataset_path = os.path.join(settings.BASE_DIR, 'face_auth', 'dataset', str(obj.voter_id))
+        if os.path.isdir(dataset_path):
+            shutil.rmtree(dataset_path, ignore_errors=True)
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        import os, shutil
+        from django.conf import settings
+        for obj in queryset:
+            dataset_path = os.path.join(settings.BASE_DIR, 'face_auth', 'dataset', str(obj.voter_id))
+            if os.path.isdir(dataset_path):
+                shutil.rmtree(dataset_path, ignore_errors=True)
+        super().delete_queryset(request, queryset)
 
     def get_readonly_fields(self, request, obj=None):
         if obj:

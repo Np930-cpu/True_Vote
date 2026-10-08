@@ -358,3 +358,96 @@ def admin_login(request):
     if user and not user.is_staff:
         return Response({'error': 'You do not have admin privileges.'}, status=403)
     return Response({'error': 'Invalid credentials.'}, status=401)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_voters(request):
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({'error': 'Admin privileges required'}, status=403)
+
+    search = request.query_params.get('search', '').strip()
+    status_filter = request.query_params.get('status', '').strip()
+
+    qs = Voters.objects.filter(is_superuser=False)
+    if search:
+        from django.db.models import Q
+        qs = qs.filter(Q(voter_id__icontains=search) | Q(name__icontains=search) | Q(email_id__icontains=search))
+
+    if status_filter == 'verified':
+        qs = qs.filter(is_verified=True)
+    elif status_filter == 'unverified':
+        qs = qs.filter(is_verified=False)
+    elif status_filter == 'active':
+        qs = qs.filter(is_active=True)
+    elif status_filter == 'inactive':
+        qs = qs.filter(is_active=False)
+
+    import os
+    from votes.models import votes as VoteModel
+
+    results = []
+    for v in qs.order_by('-id'):
+        dataset_path = os.path.join(settings.BASE_DIR, 'face_auth', 'dataset', str(v.voter_id))
+        face_registered = os.path.isdir(dataset_path) and len(os.listdir(dataset_path)) > 0
+        voted_count = VoteModel.objects.filter(voter=v).count()
+
+        results.append({
+            'id': v.id,
+            'voter_id': v.voter_id,
+            'name': v.name,
+            'age': v.age,
+            'email_id': v.email_id,
+            'otp_verified': v.otp_verified,
+            'is_verified': v.is_verified,
+            'is_active': v.is_active,
+            'face_registered': face_registered,
+            'voted_count': voted_count,
+        })
+
+    return Response(results)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_voter(request, voter_id):
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({'error': 'Admin privileges required'}, status=403)
+
+    try:
+        voter = Voters.objects.get(voter_id=voter_id)
+    except Voters.DoesNotExist:
+        return Response({'error': 'Voter not found'}, status=404)
+
+    if 'is_active' in request.data:
+        voter.is_active = bool(request.data['is_active'])
+    if 'is_verified' in request.data:
+        voter.is_verified = bool(request.data['is_verified'])
+    if 'name' in request.data and str(request.data['name']).strip():
+        voter.name = str(request.data['name']).strip()
+    if 'email_id' in request.data and str(request.data['email_id']).strip():
+        voter.email_id = str(request.data['email_id']).strip()
+
+    voter.save()
+    return Response({'message': 'Voter updated successfully'})
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_voter(request, voter_id):
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({'error': 'Admin privileges required'}, status=403)
+
+    try:
+        voter = Voters.objects.get(voter_id=voter_id)
+    except Voters.DoesNotExist:
+        return Response({'error': 'Voter not found'}, status=404)
+
+    import os, shutil
+    dataset_path = os.path.join(settings.BASE_DIR, 'face_auth', 'dataset', str(voter.voter_id))
+    if os.path.isdir(dataset_path):
+        shutil.rmtree(dataset_path, ignore_errors=True)
+
+    voter.delete()
+    return Response({'message': 'Voter and biometric data deleted successfully'})
+

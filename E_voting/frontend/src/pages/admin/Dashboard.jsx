@@ -1,15 +1,22 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getDashboard } from '../../api';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const navigate = useNavigate();
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
-    try { const r = await getDashboard(); setData(r.data); }
-    finally { setLoading(false); setRefreshing(false); }
+    try {
+      const r = await getDashboard();
+      setData(r.data);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -27,28 +34,84 @@ export default function Dashboard() {
     { label: 'Voter Turnout', value: `${turnout}%`, icon: '📊', color: 'var(--purple)', glow: 'rgba(167,139,250,0.12)' },
   ] : [];
 
+  const exportSummaryCSV = () => {
+    if (!data || !data.candidate_votes) return;
+    const headers = ['Candidate Name', 'Total Votes', 'Percentage'];
+    const rows = data.candidate_votes.map(c => [
+      `"${c.candidate__name.replace(/"/g, '""')}"`,
+      c.total,
+      `${total > 0 ? ((c.total / total) * 100).toFixed(1) : 0}%`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `election_tally_report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
-    <div className="container">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+    <div className="container" style={{ paddingBottom: '3rem' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1>Dashboard</h1>
-          <p>Live overview — auto-refreshes every 10 seconds</p>
+          <h1>Admin Control Center</h1>
+          <p>Real-time analytics, voter management, and ballot customization</p>
         </div>
-        <button
-          className="btn btn-secondary"
-          onClick={() => load(true)}
-          disabled={refreshing}
-          style={{ fontSize: '0.82rem', gap: '0.4rem' }}
-        >
-          <span style={{ display: 'inline-block', animation: refreshing ? 'spin 0.7s linear infinite' : 'none' }}>↻</span>
-          {refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.6rem' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={exportSummaryCSV}
+            disabled={!data || data.candidate_votes.length === 0}
+            style={{ fontSize: '0.82rem' }}
+          >
+            📊 Export Tally CSV
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => load(true)}
+            disabled={refreshing}
+            style={{ fontSize: '0.82rem', gap: '0.4rem' }}
+          >
+            <span style={{ display: 'inline-block', animation: refreshing ? 'spin 0.7s linear infinite' : 'none' }}>↻</span>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {loading && <div className="spinner" />}
 
       {data && (
         <>
+          {/* Quick Action Navigation Grid */}
+          <div className="grid-4" style={{ marginBottom: '1.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            {[
+              { title: 'Elections', desc: 'Create & edit elections', icon: '🗳️', path: '/admin/elections', color: 'var(--blue)' },
+              { title: 'Candidates', desc: 'Manage contestants & symbols', icon: '🏛️', path: '/admin/candidates', color: 'var(--purple)' },
+              { title: 'Voter Accounts', desc: 'Verify & manage voters', icon: '👥', path: '/admin/voters', color: 'var(--green)' },
+              { title: 'Blockchain Ledger', desc: 'Audit immutable vote blocks', icon: '⛓️', path: '/admin/blockchain', color: 'var(--amber)' },
+            ].map((btn, i) => (
+              <div
+                key={i}
+                className="card"
+                onClick={() => navigate(btn.path)}
+                style={{
+                  cursor: 'pointer', padding: '1.25rem', transition: 'all 0.2s',
+                  display: 'flex', alignItems: 'center', gap: '0.85rem',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = btn.color; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+              >
+                <div style={{ fontSize: '2rem' }}>{btn.icon}</div>
+                <div>
+                  <div style={{ fontWeight: 700, color: 'var(--ink)' }}>{btn.title}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--ink2)', marginTop: '0.15rem' }}>{btn.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
           {/* Stat cards */}
           <div className="grid-3" style={{ marginBottom: '1.75rem' }}>
             {statCards.map((s, i) => (
@@ -99,7 +162,7 @@ export default function Dashboard() {
             <div className="winner-banner" style={{ marginBottom: '1.5rem' }}>
               <span className="trophy">🏆</span>
               <h2>{data.winner.candidate__name}</h2>
-              <p>{data.winner.total} votes · current leader</p>
+              <p>{data.winner.total} votes · Current Leader</p>
             </div>
           )}
 

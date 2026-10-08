@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     register_voter, send_otp, verify_otp, complete_registration,
-    send_login_otp, verify_login_otp, voter_profile, admin_login
+    send_login_otp, verify_login_otp, voter_profile, admin_login,
+    list_voters, update_voter, delete_voter
 )
 
 urlpatterns = [
@@ -13,4 +14,7 @@ urlpatterns = [
     path('verify-login-otp/', verify_login_otp),
     path('profile/', voter_profile),
     path('admin-login/', admin_login),
+    path('voters/', list_voters),
+    path('voters/<str:voter_id>/', update_voter),
+    path('voters/<str:voter_id>/delete/', delete_voter),
 ]
