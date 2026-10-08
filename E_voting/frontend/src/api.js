@@ -26,6 +26,8 @@ API.interceptors.request.use((config) => {
   const currentBase = getBaseURL();
   if (currentBase) {
     config.baseURL = currentBase;
+  } else if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    console.warn('[TrueVote] VITE_API_BASE_URL is not set on Vercel! Requests are going to Vercel domain instead of Render backend.');
   }
   const token = localStorage.getItem('admin_access') || localStorage.getItem('access');
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -35,6 +37,7 @@ API.interceptors.request.use((config) => {
 API.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.error('[TrueVote API Error]', error.config?.method?.toUpperCase(), (error.config?.baseURL || '') + (error.config?.url || ''), error.message, error.response?.status);
     if (error.response?.status === 401) {
       const url = error.config?.url || '';
       if (!url.includes('/login/') && !url.includes('/register/') && !url.includes('/admin-login/')) {
