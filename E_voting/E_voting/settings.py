@@ -6,8 +6,9 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file
+# Load environment variables from .env file (both project root and parent workspace)
 load_dotenv(BASE_DIR / '.env')
+load_dotenv(BASE_DIR.parent / '.env')
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'fallback-insecure-key-change-me')
 
