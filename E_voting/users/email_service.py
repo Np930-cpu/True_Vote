@@ -10,7 +10,7 @@ from django.core.mail import send_mail
 def send_otp_via_resend(recipient, otp, subject):
     api_key = (os.environ.get('RESEND_API_KEY') or getattr(settings, 'RESEND_API_KEY', '')).strip()
     if not api_key:
-        return False
+        return False, "RESEND_API_KEY is not configured"
 
     from_email = os.environ.get('RESEND_FROM_EMAIL', 'TrueVote <onboarding@resend.dev>')
     payload = json.dumps({
@@ -36,17 +36,30 @@ def send_otp_via_resend(recipient, otp, subject):
         headers={
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json',
-            'User-Agent': 'TrueVote/1.0',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return resp.status in (200, 201)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.status in (200, 201):
+                return True, "Delivered via Resend"
+            return False, f"Resend returned HTTP status {resp.status}"
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='ignore')
+        try:
+            err_json = json.loads(body)
+            msg = err_json.get('message') or body
+        except Exception:
+            msg = body
+        return False, f"Resend error ({e.code}): {msg}"
+    except Exception as e:
+        return False, f"Resend request failed: {str(e)}"
 
 
 def send_otp_via_brevo(recipient, otp, subject):
     api_key = (os.environ.get('BREVO_API_KEY') or getattr(settings, 'BREVO_API_KEY', '')).strip()
     if not api_key:
-        return False
+        return False, "BREVO_API_KEY is not configured"
 
     sender_email = (
         os.environ.get('BREVO_FROM_EMAIL')
@@ -77,24 +90,40 @@ def send_otp_via_brevo(recipient, otp, subject):
         headers={
             'api-key': api_key,
             'Content-Type': 'application/json',
-            'User-Agent': 'TrueVote/1.0',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return resp.status in (200, 201)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.status in (200, 201):
+                return True, "Delivered via Brevo"
+            return False, f"Brevo returned HTTP status {resp.status}"
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='ignore')
+        try:
+            err_json = json.loads(body)
+            msg = err_json.get('message') or body
+        except Exception:
+            msg = body
+        return False, f"Brevo error ({e.code}): {msg}"
+    except Exception as e:
+        return False, f"Brevo request failed: {str(e)}"
 
 
 def send_otp_via_smtp(recipient, otp, subject):
     if not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
-        return False
-    send_mail(
-        subject,
-        f'Your TrueVote verification OTP is: {otp}\n\nIt expires in 2 minutes. Please enter this code on the website to verify your account.',
-        settings.EMAIL_HOST_USER or 'noreply@truevote.app',
-        [recipient],
-        fail_silently=False
-    )
-    return True
+        return False, "SMTP credentials are not configured"
+    try:
+        send_mail(
+            subject,
+            f'Your TrueVote verification OTP is: {otp}\n\nIt expires in 2 minutes. Please enter this code on the website to verify your account.',
+            settings.EMAIL_HOST_USER or 'noreply@truevote.app',
+            [recipient],
+            fail_silently=False
+        )
+        return True, "Delivered via SMTP"
+    except Exception as e:
+        return False, f"SMTP error: {str(e)}"
 
 
 def deliver_otp(recipient_email, otp, subject='TrueVote — Verification OTP'):
@@ -103,42 +132,40 @@ def deliver_otp(recipient_email, otp, subject='TrueVote — Verification OTP'):
     1. Resend HTTPS API (works on Render free tier over port 443)
     2. Brevo HTTPS API (works on Render free tier over port 443)
     3. Django SMTP (works locally or on unblocked hosts)
+    Returns (success: bool, status_message: str)
     """
+    errors = []
+
     # 1. Resend API
     if os.environ.get('RESEND_API_KEY') or getattr(settings, 'RESEND_API_KEY', None):
-        try:
-            if send_otp_via_resend(recipient_email, otp, subject):
-                print(f"[TrueVote] ✅ OTP delivered via Resend API to {recipient_email}")
-                return True
-        except urllib.error.HTTPError as e:
-            body = e.read().decode('utf-8', errors='ignore')
-            print(f"[TrueVote] ⚠️ Resend API HTTP error ({e.code}) to {recipient_email}: {body}")
-        except Exception as e:
-            print(f"[TrueVote] ⚠️ Resend API delivery failed to {recipient_email}: {e}")
+        success, msg = send_otp_via_resend(recipient_email, otp, subject)
+        if success:
+            print(f"[TrueVote] ✅ OTP delivered via Resend API to {recipient_email}")
+            return True, msg
+        errors.append(msg)
+        print(f"[TrueVote] ⚠️ Resend delivery failed to {recipient_email}: {msg}")
 
     # 2. Brevo API
     if os.environ.get('BREVO_API_KEY') or getattr(settings, 'BREVO_API_KEY', None):
-        try:
-            if send_otp_via_brevo(recipient_email, otp, subject):
-                print(f"[TrueVote] ✅ OTP delivered via Brevo API to {recipient_email}")
-                return True
-        except urllib.error.HTTPError as e:
-            body = e.read().decode('utf-8', errors='ignore')
-            print(f"[TrueVote] ⚠️ Brevo API HTTP error ({e.code}) to {recipient_email}: {body}")
-        except Exception as e:
-            print(f"[TrueVote] ⚠️ Brevo API delivery failed to {recipient_email}: {e}")
+        success, msg = send_otp_via_brevo(recipient_email, otp, subject)
+        if success:
+            print(f"[TrueVote] ✅ OTP delivered via Brevo API to {recipient_email}")
+            return True, msg
+        errors.append(msg)
+        print(f"[TrueVote] ⚠️ Brevo delivery failed to {recipient_email}: {msg}")
 
     # 3. SMTP (Google Gmail / custom SMTP)
     if settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD:
-        try:
-            if send_otp_via_smtp(recipient_email, otp, subject):
-                print(f"[TrueVote] ✅ OTP delivered via SMTP to {recipient_email}")
-                return True
-        except Exception as e:
-            print(f"[TrueVote] ⚠️ SMTP delivery failed to {recipient_email}: {e}")
+        success, msg = send_otp_via_smtp(recipient_email, otp, subject)
+        if success:
+            print(f"[TrueVote] ✅ OTP delivered via SMTP to {recipient_email}")
+            return True, msg
+        errors.append(msg)
+        print(f"[TrueVote] ⚠️ SMTP delivery failed to {recipient_email}: {msg}")
 
-    print(f"[TrueVote] ❌ Failed to deliver OTP email to {recipient_email} across all channels.")
-    return False
+    error_summary = "; ".join(errors) if errors else "No email delivery provider configured"
+    print(f"[TrueVote] ❌ Failed to deliver OTP email to {recipient_email}: {error_summary}")
+    return False, error_summary
 
 
 def send_otp_email_async(recipient_email, otp, subject='TrueVote — Verification OTP'):

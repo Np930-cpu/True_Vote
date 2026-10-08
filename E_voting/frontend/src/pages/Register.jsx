@@ -173,7 +173,7 @@ export default function Register() {
           {step === 2 && (
             <form onSubmit={handleOtp}>
               <p style={{ color: 'var(--ink2)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: 1.6 }}>
-                We sent a 6-digit verification code to <strong style={{ color: 'var(--blue)' }}>{form.email_id}</strong>. Please check your inbox (and spam folder) and enter the code below.
+                We sent a 6-digit verification code to <strong style={{ color: 'var(--blue)' }}>{form.email_id}</strong>. Please check your <strong>Inbox</strong> (and <strong>Spam / Junk</strong> folder) and enter the code below.
               </p>
               <div className="form-group">
                 <label>Verification Code</label>

@@ -15,7 +15,7 @@ from django.conf import settings
 from .models import Voters
 
 
-from .email_service import send_otp_email_async
+from .email_service import deliver_otp, send_otp_email_async
 
 
 @api_view(['POST'])
@@ -42,10 +42,19 @@ def register_voter(request):
     except (ValueError, TypeError):
         return Response({"error": "Valid age (integer >= 18) is required"}, status=400)
 
-    if Voters.objects.filter(voter_id__iexact=voter_id).exists():
-        return Response({"error": "Voter ID already registered"}, status=400)
-    if Voters.objects.filter(email_id__iexact=email_id).exists():
-        return Response({"error": "Email already registered"}, status=400)
+    existing_voter = Voters.objects.filter(voter_id__iexact=voter_id).first()
+    if existing_voter:
+        if existing_voter.is_verified:
+            return Response({"error": "Voter ID already registered and verified"}, status=400)
+        else:
+            existing_voter.delete()
+
+    existing_email = Voters.objects.filter(email_id__iexact=email_id).first()
+    if existing_email:
+        if existing_email.is_verified:
+            return Response({"error": "Email already registered and verified"}, status=400)
+        else:
+            existing_email.delete()
 
     # Store strictly in cache — NEVER in DB until all 3 steps succeed
     cache.set(f'pending_reg_{voter_id}', {
@@ -80,9 +89,11 @@ def send_otp(request):
             cache.set(f'pending_reg_{voter_id}', pending, timeout=3600)
 
             target_email = pending['email_id']
-            send_otp_email_async(target_email, otp, 'TrueVote — Email Verification OTP')
+            success, msg = deliver_otp(target_email, otp, 'TrueVote — Email Verification OTP')
+            if not success:
+                return Response({'error': f'Failed to deliver OTP email: {msg}'}, status=400)
 
-            resp = {'message': f'OTP sent to {target_email}. Please check your email inbox.'}
+            resp = {'message': f'OTP sent to {target_email}. Please check your email inbox (and Spam/Junk folder).'}
             return Response(resp)
 
     # Fallback for existing users
@@ -99,9 +110,11 @@ def send_otp(request):
     user.otp_created_at = timezone.now()
     user.save()
 
-    send_otp_email_async(user.email_id, otp, 'TrueVote — Email Verification OTP')
+    success, msg = deliver_otp(user.email_id, otp, 'TrueVote — Email Verification OTP')
+    if not success:
+        return Response({'error': f'Failed to deliver OTP email: {msg}'}, status=400)
 
-    resp = {'message': f'OTP sent to {user.email_id}. Please check your email inbox.'}
+    resp = {'message': f'OTP sent to {user.email_id}. Please check your email inbox (and Spam/Junk folder).'}
     return Response(resp)
 
 
@@ -252,9 +265,11 @@ def send_login_otp(request):
     user.otp_created_at = timezone.now()
     user.save()
 
-    send_otp_email_async(user.email_id, otp, 'TrueVote — Login OTP')
+    success, msg = deliver_otp(user.email_id, otp, 'TrueVote — Login OTP')
+    if not success:
+        return Response({'error': f'Failed to deliver login OTP email: {msg}'}, status=400)
 
-    resp = {'message': f'OTP sent to {user.email_id}. Please check your email inbox.'}
+    resp = {'message': f'OTP sent to {user.email_id}. Please check your email inbox (and Spam/Junk folder).'}
     return Response(resp)
 
 
@@ -498,9 +513,11 @@ def forgot_password(request):
     user.otp_created_at = timezone.now()
     user.save()
 
-    send_otp_email_async(user.email_id, otp, 'TrueVote — Password Reset Code')
+    success, msg = deliver_otp(user.email_id, otp, 'TrueVote — Password Reset Code')
+    if not success:
+        return Response({'error': f'Failed to deliver password reset email: {msg}'}, status=400)
 
-    resp = {'message': f'Password reset OTP sent to {email}. Please check your email inbox.'}
+    resp = {'message': f'Password reset OTP sent to {email}. Please check your email inbox (and Spam/Junk folder).'}
     return Response(resp)
 
 
