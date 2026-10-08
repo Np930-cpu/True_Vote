@@ -17,31 +17,50 @@ export default function FaceVerify({ expectedUserId, onSuccess, onError }) {
     }
   }, []);
 
-  useEffect(() => () => stopCamera(), [stopCamera]);
-
-  const startCamera = async () => {
-    setMsg('');
+  const startCamera = useCallback(async () => {
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setMsg('Camera access requires a secure connection (HTTPS or localhost).');
+        setPhase('error');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 640, height: 480, facingMode: 'user' },
       });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Wait for the camera to actually produce frames before allowing verify
         await new Promise((resolve) => {
           videoRef.current.oncanplay = resolve;
           videoRef.current.play();
         });
-        // Extra warm-up: some cameras need a moment after canplay to expose correctly
         await new Promise(r => setTimeout(r, 800));
       }
       setPhase('streaming');
-    } catch {
-      setMsg('Camera access denied. Please allow camera permissions.');
+    } catch (err) {
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setMsg('Camera permission is blocked. Click the 🔒 or 📷 icon in your browser address bar, set Camera to "Allow", and click Try Again.');
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setMsg('No camera detected. Please connect a webcam.');
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setMsg('Camera is currently in use by another application. Please close other camera programs and try again.');
+      } else {
+        setMsg(err.message || 'Camera access denied. Please allow camera permissions.');
+      }
       setPhase('error');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) startCamera();
+    });
+    return () => {
+      active = false;
+      stopCamera();
+    };
+  }, [startCamera, stopCamera]);
 
   const verify = async () => {
     setPhase('scanning');
