@@ -1,8 +1,8 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { saveFaceFramesBatch, registerFace } from '../api';
 
-const TOTAL_FRAMES = 15;
-const CAPTURE_INTERVAL = 400;
+const TOTAL_FRAMES = 8;
+const CAPTURE_INTERVAL = 250;
 
 export default function FaceCapture({ userId, onSuccess, onError }) {
   const videoRef = useRef(null);
@@ -39,7 +39,7 @@ export default function FaceCapture({ userId, onSuccess, onError }) {
           videoRef.current.oncanplay = resolve;
           videoRef.current.play();
         });
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 600));
       }
       setPhase('streaming');
     } catch (err) {
@@ -76,10 +76,10 @@ export default function FaceCapture({ userId, onSuccess, onError }) {
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    const vw = video.videoWidth || 640;
-    const vh = video.videoHeight || 480;
-    canvas.width = vw;
-    canvas.height = vh;
+    const targetW = 360;
+    const targetH = 270;
+    canvas.width = targetW;
+    canvas.height = targetH;
 
     const ctx = canvas.getContext('2d');
     const frames = [];
@@ -87,7 +87,7 @@ export default function FaceCapture({ userId, onSuccess, onError }) {
     // Helper: check if a frame is mostly black (camera not ready)
     const isBlackFrame = () => {
       try {
-        const sample = ctx.getImageData(Math.floor(vw / 2 - 20), Math.floor(vh / 2 - 20), 40, 40).data;
+        const sample = ctx.getImageData(Math.floor(targetW / 2 - 15), Math.floor(targetH / 2 - 15), 30, 30).data;
         let total = 0;
         for (let i = 0; i < sample.length; i += 4) total += sample[i] + sample[i + 1] + sample[i + 2];
         return total / (sample.length / 4) < 12; // avg brightness < 12 = black
@@ -102,16 +102,16 @@ export default function FaceCapture({ userId, onSuccess, onError }) {
       intervalRef.current = setInterval(() => {
         ctx.save();
         ctx.scale(-1, 1);
-        ctx.drawImage(video, -vw, 0, vw, vh);
+        ctx.drawImage(video, -targetW, 0, targetW, targetH);
         ctx.restore();
 
-        // Skip black frames during sensor warm-up (up to 8 skips max)
-        if (isBlackFrame() && skipped < 8) {
+        // Skip black frames during sensor warm-up (up to 5 skips max)
+        if (isBlackFrame() && skipped < 5) {
           skipped++;
           return;
         }
 
-        const frame = canvas.toDataURL('image/jpeg', 0.88);
+        const frame = canvas.toDataURL('image/jpeg', 0.75);
         frames.push(frame);
         count++;
         setCaptured(count);

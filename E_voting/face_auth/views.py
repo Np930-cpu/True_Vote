@@ -11,6 +11,42 @@ from .recognize import recognize_face
 from .duplicate_check import check_face_duplicate
 from .cascade_loader import get_face_cascade
 
+_CACHED_MODEL = None
+_CACHED_LABELS = None
+_CACHED_MTIME = 0
+
+def get_loaded_face_model():
+    """
+    Returns (model, label_map) cached in memory.
+    Automatically reloads only if the model file on disk has changed.
+    """
+    global _CACHED_MODEL, _CACHED_LABELS, _CACHED_MTIME
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    model_path  = os.path.join(BASE_DIR, 'face_auth', 'model', 'face_model.yml')
+    labels_path = os.path.join(BASE_DIR, 'face_auth', 'model', 'labels.json')
+
+    if not os.path.exists(model_path) or not os.path.exists(labels_path):
+        return None, None
+
+    try:
+        mtime = os.path.getmtime(model_path)
+        if _CACHED_MODEL is not None and _CACHED_MTIME == mtime:
+            return _CACHED_MODEL, _CACHED_LABELS
+
+        with open(labels_path, 'r') as f:
+            label_map = json.load(f)
+
+        model = cv2.face.LBPHFaceRecognizer_create()
+        model.read(model_path)
+
+        _CACHED_MODEL = model
+        _CACHED_LABELS = label_map
+        _CACHED_MTIME = mtime
+        return _CACHED_MODEL, _CACHED_LABELS
+    except Exception as e:
+        print(f"[FaceAuth] Error loading cached model: {e}")
+        return None, None
+
 
 @api_view(['POST'])
 def save_face_frames_batch(request):
@@ -36,15 +72,11 @@ def save_face_frames_batch(request):
 
     face_cascade = get_face_cascade()
 
-    existing_model = None
-    label_map = {}
-    if os.path.exists(model_path) and os.path.exists(labels_path):
-        with open(labels_path, 'r') as f:
-            label_map = json.load(f)
+    existing_model, label_map = get_loaded_face_model()
+    if existing_model is not None and label_map:
         other_users = [v for v in label_map.values() if str(v).lower() != str(user_id).lower()]
-        if other_users:
-            existing_model = cv2.face.LBPHFaceRecognizer_create()
-            existing_model.read(model_path)
+        if not other_users:
+            existing_model = None
 
     os.makedirs(save_path, exist_ok=True)
 
@@ -157,18 +189,9 @@ def recognize_from_frame(request):
     if not frame_b64:
         return Response({'error': 'frame required'}, status=400)
 
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    model_path  = os.path.join(BASE_DIR, 'face_auth', 'model', 'face_model.yml')
-    labels_path = os.path.join(BASE_DIR, 'face_auth', 'model', 'labels.json')
-
-    if not os.path.exists(model_path):
+    model, label_map = get_loaded_face_model()
+    if model is None or label_map is None:
         return Response({'error': 'Face model not found. No faces registered yet.'}, status=400)
-
-    with open(labels_path, 'r') as f:
-        label_map = json.load(f)
-
-    model = cv2.face.LBPHFaceRecognizer_create()
-    model.read(model_path)
 
     img_data = base64.b64decode(frame_b64.split(',')[-1])
     np_arr = np.frombuffer(img_data, np.uint8)
@@ -216,6 +239,8 @@ def register_face(request):
         return Response({'error': 'No face frames found. Please capture your face first.'}, status=400)
 
     train_model()
+    global _CACHED_MTIME
+    _CACHED_MTIME = 0
 
     # Final duplicate check after training with the new data included
     is_duplicate, matched_user = check_face_duplicate(user_id)
