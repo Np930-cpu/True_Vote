@@ -64,7 +64,6 @@ def send_otp_via_brevo(recipient, otp, subject):
     sender_email = (
         os.environ.get('BREVO_FROM_EMAIL')
         or getattr(settings, 'EMAIL_HOST_USER', '')
-        or 'nishant.pandey516532@gmail.com'
     )
     sender_name = os.environ.get('BREVO_FROM_NAME', 'TrueVote')
     payload = json.dumps({
