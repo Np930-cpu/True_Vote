@@ -61,14 +61,35 @@ def send_otp(request):
             pending['otp'] = otp
             pending['otp_created_at'] = timezone.now().isoformat()
             cache.set(f'pending_reg_{voter_id}', pending, timeout=3600)
-            send_mail(
-                'TrueVote — Email Verification OTP',
-                f'Your OTP is {otp}. It expires in 2 minutes.',
-                settings.EMAIL_HOST_USER,
-                [pending['email_id']],
-                fail_silently=False
-            )
-            return Response({'message': 'OTP sent'})
+
+            email_sent = False
+            mail_err_msg = ""
+            try:
+                send_mail(
+                    'TrueVote — Email Verification OTP',
+                    f'Your OTP is {otp}. It expires in 2 minutes.',
+                    settings.EMAIL_HOST_USER or 'noreply@truevote.app',
+                    [pending['email_id']],
+                    fail_silently=False
+                )
+                email_sent = True
+            except Exception as e:
+                mail_err_msg = str(e)
+                print(f"[TrueVote] ⚠️ SMTP delivery failed to {pending['email_id']}: {e}")
+                print(f"==================================================")
+                print(f"  🔐 DEV / FALLBACK OTP FOR {pending['email_id']}: {otp}")
+                print(f"==================================================")
+
+            if email_sent:
+                return Response({'message': f'OTP sent to {pending["email_id"]}'})
+            elif settings.DEBUG:
+                return Response({
+                    'message': f'OTP generated! In dev mode, your OTP is: {otp}',
+                    'dev_otp': otp,
+                    'warning': f'SMTP failed ({mail_err_msg})'
+                })
+            else:
+                return Response({'error': f'Failed to send OTP email: {mail_err_msg}'}, status=500)
 
     # Fallback for existing users
     try:
@@ -84,14 +105,34 @@ def send_otp(request):
     user.otp_created_at = timezone.now()
     user.save()
 
-    send_mail(
-        'TrueVote — Email Verification OTP',
-        f'Your OTP is {otp}. It expires in 2 minutes.',
-        settings.EMAIL_HOST_USER,
-        [user.email_id],
-        fail_silently=False
-    )
-    return Response({'message': 'OTP sent'})
+    email_sent = False
+    mail_err_msg = ""
+    try:
+        send_mail(
+            'TrueVote — Email Verification OTP',
+            f'Your OTP is {otp}. It expires in 2 minutes.',
+            settings.EMAIL_HOST_USER or 'noreply@truevote.app',
+            [user.email_id],
+            fail_silently=False
+        )
+        email_sent = True
+    except Exception as e:
+        mail_err_msg = str(e)
+        print(f"[TrueVote] ⚠️ SMTP delivery failed to {user.email_id}: {e}")
+        print(f"==================================================")
+        print(f"  🔐 DEV / FALLBACK OTP FOR {user.email_id}: {otp}")
+        print(f"==================================================")
+
+    if email_sent:
+        return Response({'message': f'OTP sent to {user.email_id}'})
+    elif settings.DEBUG:
+        return Response({
+            'message': f'OTP generated! In dev mode, your OTP is: {otp}',
+            'dev_otp': otp,
+            'warning': f'SMTP failed ({mail_err_msg})'
+        })
+    else:
+        return Response({'error': f'Failed to send OTP email: {mail_err_msg}'}, status=500)
 
 
 @api_view(['POST'])
@@ -214,14 +255,34 @@ def send_login_otp(request):
     user.otp_created_at = timezone.now()
     user.save()
 
-    send_mail(
-        'TrueVote — Login OTP',
-        f'Your login OTP is {otp}. It expires in 2 minutes.',
-        settings.EMAIL_HOST_USER,
-        [user.email_id],
-        fail_silently=False
-    )
-    return Response({'message': f'OTP sent to {user.email_id}'})
+    email_sent = False
+    mail_err_msg = ""
+    try:
+        send_mail(
+            'TrueVote — Login OTP',
+            f'Your login OTP is {otp}. It expires in 2 minutes.',
+            settings.EMAIL_HOST_USER or 'noreply@truevote.app',
+            [user.email_id],
+            fail_silently=False
+        )
+        email_sent = True
+    except Exception as e:
+        mail_err_msg = str(e)
+        print(f"[TrueVote] ⚠️ SMTP Error sending login OTP to {user.email_id}: {e}")
+        print(f"==================================================")
+        print(f"  🔐 DEV / FALLBACK LOGIN OTP FOR {user.email_id}: {otp}")
+        print(f"==================================================")
+
+    if email_sent:
+        return Response({'message': f'OTP sent to {user.email_id}'})
+    elif settings.DEBUG:
+        return Response({
+            'message': f'Login OTP generated! (Dev mode: Your OTP is {otp})',
+            'dev_otp': otp,
+            'warning': f'SMTP credentials failed ({mail_err_msg})'
+        })
+    else:
+        return Response({'error': f'Failed to send login email: {mail_err_msg}'}, status=500)
 
 
 @api_view(['POST'])

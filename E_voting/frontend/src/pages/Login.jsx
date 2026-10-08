@@ -30,9 +30,13 @@ export default function Login() {
     try {
       const res = await sendLoginOtp({ voter_id: voterId });
       setMaskedEmail(res.data.message);
+      if (res.data?.dev_otp) {
+        setOtp(res.data.dev_otp);
+        setMsg({ type: 'success', text: res.data.message || `Dev Mode: OTP is ${res.data.dev_otp}` });
+      }
       setStep(2);
     } catch (err) {
-      const error = err.response?.data?.error || 'Failed to send OTP.';
+      const error = err.response?.data?.error || err.response?.data?.message || 'Failed to send OTP.';
       setMsg({ type: 'error', text: error });
     }
     setLoading(false);

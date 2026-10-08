@@ -31,11 +31,33 @@ export default function Register() {
     e.preventDefault(); setLoading(true); setMsg({});
     try {
       await registerVoter(form);
-      await sendOtp({ voter_id: form.voter_id, email: form.email_id });
-      setMsg({ type: 'success', text: `OTP sent to ${form.email_id}` });
+      const res = await sendOtp({ voter_id: form.voter_id, email: form.email_id });
+      if (res.data?.dev_otp) {
+        setOtp(res.data.dev_otp);
+        setMsg({ type: 'success', text: res.data.message || `Dev OTP: ${res.data.dev_otp}` });
+      } else {
+        setMsg({ type: 'success', text: `OTP sent to ${form.email_id}` });
+      }
       setStep(2);
     } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.error || 'Registration failed.' });
+      const errorText = err.response?.data?.error || err.response?.data?.message || 'Registration failed. Please check your details.';
+      setMsg({ type: 'error', text: errorText });
+    }
+    setLoading(false);
+  };
+
+  const handleResendOtp = async () => {
+    setLoading(true); setMsg({});
+    try {
+      const res = await sendOtp({ voter_id: form.voter_id, email: form.email_id });
+      if (res.data?.dev_otp) {
+        setOtp(res.data.dev_otp);
+        setMsg({ type: 'success', text: res.data.message || `New Dev OTP: ${res.data.dev_otp}` });
+      } else {
+        setMsg({ type: 'success', text: `New OTP sent to ${form.email_id}` });
+      }
+    } catch (err) {
+      setMsg({ type: 'error', text: err.response?.data?.error || 'Failed to resend OTP.' });
     }
     setLoading(false);
   };
@@ -44,10 +66,10 @@ export default function Register() {
     e.preventDefault(); setLoading(true); setMsg({});
     try {
       await verifyOtp({ voter_id: form.voter_id, otp });
-      setMsg({ type: 'success', text: 'Email verified.' });
+      setMsg({ type: 'success', text: 'Email verified successfully!' });
       setStep(3);
     } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.error || 'OTP verification failed.' });
+      setMsg({ type: 'error', text: err.response?.data?.error || 'OTP verification failed. Please try again.' });
     }
     setLoading(false);
   };
@@ -114,7 +136,7 @@ export default function Register() {
           {step === 2 && (
             <form onSubmit={handleOtp}>
               <p style={{ color: 'var(--ink2)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: 1.6 }}>
-                We sent a 6-digit code to <strong style={{ color: 'var(--blue)' }}>{form.email_id}</strong>
+                We sent a 6-digit verification code to <strong style={{ color: 'var(--blue)' }}>{form.email_id}</strong>
               </p>
               <div className="form-group">
                 <label>Verification Code</label>
@@ -124,9 +146,26 @@ export default function Register() {
                   style={{ fontSize: '1.6rem', letterSpacing: '0.6rem', textAlign: 'center', fontFamily: 'monospace' }}
                 />
               </div>
-              <button className="btn btn-primary btn-full" disabled={loading}>
+              <button className="btn btn-primary btn-full" disabled={loading} style={{ marginBottom: '0.75rem' }}>
                 {loading ? 'Verifying…' : 'Verify Code'}
               </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  style={{ background: 'none', border: 'none', color: 'var(--ink2)', cursor: 'pointer', padding: 0 }}
+                >
+                  ← Edit details
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={loading}
+                  style={{ background: 'none', border: 'none', color: 'var(--blue)', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                >
+                  Resend code
+                </button>
+              </div>
             </form>
           )}
 
