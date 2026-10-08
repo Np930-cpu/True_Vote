@@ -75,7 +75,7 @@ if database_url:
     DATABASES = {
         'default': dj_database_url.config(default=database_url, conn_max_age=600)
     }
-elif os.environ.get('USE_SQLITE', 'False').lower() in ('true', '1', 't'):
+elif os.environ.get('RENDER') or os.environ.get('USE_SQLITE', 'False').lower() in ('true', '1', 't') or not os.environ.get('DB_NAME'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',

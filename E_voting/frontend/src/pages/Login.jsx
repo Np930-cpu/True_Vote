@@ -36,7 +36,14 @@ export default function Login() {
       }
       setStep(2);
     } catch (err) {
-      const error = err.response?.data?.error || err.response?.data?.message || 'Failed to send OTP.';
+      let error = err.response?.data?.error || err.response?.data?.message;
+      if (!error) {
+        if (!err.response) {
+          error = 'Cannot connect to backend server. If deployed on Render, it may be waking up (wait 30s) or check VITE_API_BASE_URL on Vercel.';
+        } else {
+          error = 'Failed to send OTP.';
+        }
+      }
       setMsg({ type: 'error', text: error });
     }
     setLoading(false);

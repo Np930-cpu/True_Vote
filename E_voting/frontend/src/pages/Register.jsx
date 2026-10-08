@@ -40,7 +40,14 @@ export default function Register() {
       }
       setStep(2);
     } catch (err) {
-      const errorText = err.response?.data?.error || err.response?.data?.message || 'Registration failed. Please check your details.';
+      let errorText = err.response?.data?.error || err.response?.data?.message;
+      if (!errorText) {
+        if (!err.response) {
+          errorText = 'Cannot connect to backend server. If deployed on Render, it may be waking up (wait 30s) or check VITE_API_BASE_URL on Vercel.';
+        } else {
+          errorText = 'Registration failed. Please check your details.';
+        }
+      }
       setMsg({ type: 'error', text: errorText });
     }
     setLoading(false);
