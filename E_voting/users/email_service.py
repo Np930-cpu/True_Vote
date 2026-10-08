@@ -1,6 +1,7 @@
 import os
 import json
 import urllib.request
+import urllib.error
 import threading
 from django.conf import settings
 from django.core.mail import send_mail
@@ -109,6 +110,9 @@ def deliver_otp(recipient_email, otp, subject='TrueVote — Verification OTP'):
             if send_otp_via_resend(recipient_email, otp, subject):
                 print(f"[TrueVote] ✅ OTP delivered via Resend API to {recipient_email}")
                 return True
+        except urllib.error.HTTPError as e:
+            body = e.read().decode('utf-8', errors='ignore')
+            print(f"[TrueVote] ⚠️ Resend API HTTP error ({e.code}) to {recipient_email}: {body}")
         except Exception as e:
             print(f"[TrueVote] ⚠️ Resend API delivery failed to {recipient_email}: {e}")
 
@@ -118,6 +122,9 @@ def deliver_otp(recipient_email, otp, subject='TrueVote — Verification OTP'):
             if send_otp_via_brevo(recipient_email, otp, subject):
                 print(f"[TrueVote] ✅ OTP delivered via Brevo API to {recipient_email}")
                 return True
+        except urllib.error.HTTPError as e:
+            body = e.read().decode('utf-8', errors='ignore')
+            print(f"[TrueVote] ⚠️ Brevo API HTTP error ({e.code}) to {recipient_email}: {body}")
         except Exception as e:
             print(f"[TrueVote] ⚠️ Brevo API delivery failed to {recipient_email}: {e}")
 
