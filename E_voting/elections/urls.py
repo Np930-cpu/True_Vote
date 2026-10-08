@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     create_election, list_election, update_election, delete_election,
-    register_candidate, list_candidate, update_candidate, delete_candidate
+    register_candidate, list_candidate, update_candidate, delete_candidate,
+    seed_database
 )
 
 urlpatterns = [
@@ -13,5 +14,7 @@ urlpatterns = [
     path('candidate/', list_candidate),
     path('candidate/<int:candidate_id>/update/', update_candidate),
     path('candidate/<int:candidate_id>/delete/', delete_candidate),
+    path('seed-data/', seed_database),
 ]
+
 

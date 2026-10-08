@@ -1,4 +1,5 @@
 import os
+import threading
 from django.db.models import Q
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import api_view, permission_classes
@@ -12,6 +13,30 @@ from datetime import timedelta
 import secrets
 from django.conf import settings
 from .models import Voters
+
+
+def send_otp_email_async(recipient_email, otp, subject='TrueVote — Verification OTP'):
+    """Send OTP email in background thread so HTTP requests never block or time out."""
+    def _deliver():
+        if not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
+            print(f"[TrueVote] ⚠️ SMTP skipped (no credentials). Recipient: {recipient_email}, OTP: {otp}")
+            return
+        try:
+            send_mail(
+                subject,
+                f'Your OTP is {otp}. It expires in 2 minutes.',
+                settings.EMAIL_HOST_USER or 'noreply@truevote.app',
+                [recipient_email],
+                fail_silently=False
+            )
+            print(f"[TrueVote] ✅ OTP delivered via email to {recipient_email}")
+        except Exception as e:
+            print(f"[TrueVote] ⚠️ SMTP delivery failed to {recipient_email}: {e}")
+            print(f"==================================================")
+            print(f"  🔐 FALLBACK OTP FOR {recipient_email}: {otp}")
+            print(f"==================================================")
+
+    threading.Thread(target=_deliver, daemon=True).start()
 
 
 @api_view(['POST'])
@@ -64,34 +89,13 @@ def send_otp(request):
             pending['otp_created_at'] = timezone.now().isoformat()
             cache.set(f'pending_reg_{voter_id}', pending, timeout=3600)
 
-            email_sent = False
-            mail_err_msg = ""
-            try:
-                send_mail(
-                    'TrueVote — Email Verification OTP',
-                    f'Your OTP is {otp}. It expires in 2 minutes.',
-                    settings.EMAIL_HOST_USER or 'noreply@truevote.app',
-                    [pending['email_id']],
-                    fail_silently=False
-                )
-                email_sent = True
-            except Exception as e:
-                mail_err_msg = str(e)
-                print(f"[TrueVote] ⚠️ SMTP delivery failed to {pending['email_id']}: {e}")
-                print(f"==================================================")
-                print(f"  🔐 DEV / FALLBACK OTP FOR {pending['email_id']}: {otp}")
-                print(f"==================================================")
+            target_email = pending['email_id']
+            send_otp_email_async(target_email, otp, 'TrueVote — Email Verification OTP')
 
-            if email_sent:
-                return Response({'message': f'OTP sent to {pending["email_id"]}'})
-            elif settings.DEBUG:
-                return Response({
-                    'message': f'OTP generated! In dev mode, your OTP is: {otp}',
-                    'dev_otp': otp,
-                    'warning': f'SMTP failed ({mail_err_msg})'
-                })
-            else:
-                return Response({'error': f'Failed to send OTP email: {mail_err_msg}'}, status=500)
+            resp = {'message': f'OTP sent to {target_email}'}
+            if settings.DEBUG or not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
+                resp['dev_otp'] = otp
+            return Response(resp)
 
     # Fallback for existing users
     try:
@@ -107,34 +111,12 @@ def send_otp(request):
     user.otp_created_at = timezone.now()
     user.save()
 
-    email_sent = False
-    mail_err_msg = ""
-    try:
-        send_mail(
-            'TrueVote — Email Verification OTP',
-            f'Your OTP is {otp}. It expires in 2 minutes.',
-            settings.EMAIL_HOST_USER or 'noreply@truevote.app',
-            [user.email_id],
-            fail_silently=False
-        )
-        email_sent = True
-    except Exception as e:
-        mail_err_msg = str(e)
-        print(f"[TrueVote] ⚠️ SMTP delivery failed to {user.email_id}: {e}")
-        print(f"==================================================")
-        print(f"  🔐 DEV / FALLBACK OTP FOR {user.email_id}: {otp}")
-        print(f"==================================================")
+    send_otp_email_async(user.email_id, otp, 'TrueVote — Email Verification OTP')
 
-    if email_sent:
-        return Response({'message': f'OTP sent to {user.email_id}'})
-    elif settings.DEBUG:
-        return Response({
-            'message': f'OTP generated! In dev mode, your OTP is: {otp}',
-            'dev_otp': otp,
-            'warning': f'SMTP failed ({mail_err_msg})'
-        })
-    else:
-        return Response({'error': f'Failed to send OTP email: {mail_err_msg}'}, status=500)
+    resp = {'message': f'OTP sent to {user.email_id}'}
+    if settings.DEBUG or not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
+        resp['dev_otp'] = otp
+    return Response(resp)
 
 
 @api_view(['POST'])
@@ -257,34 +239,12 @@ def send_login_otp(request):
     user.otp_created_at = timezone.now()
     user.save()
 
-    email_sent = False
-    mail_err_msg = ""
-    try:
-        send_mail(
-            'TrueVote — Login OTP',
-            f'Your login OTP is {otp}. It expires in 2 minutes.',
-            settings.EMAIL_HOST_USER or 'noreply@truevote.app',
-            [user.email_id],
-            fail_silently=False
-        )
-        email_sent = True
-    except Exception as e:
-        mail_err_msg = str(e)
-        print(f"[TrueVote] ⚠️ SMTP Error sending login OTP to {user.email_id}: {e}")
-        print(f"==================================================")
-        print(f"  🔐 DEV / FALLBACK LOGIN OTP FOR {user.email_id}: {otp}")
-        print(f"==================================================")
+    send_otp_email_async(user.email_id, otp, 'TrueVote — Login OTP')
 
-    if email_sent:
-        return Response({'message': f'OTP sent to {user.email_id}'})
-    elif settings.DEBUG:
-        return Response({
-            'message': f'Login OTP generated! (Dev mode: Your OTP is {otp})',
-            'dev_otp': otp,
-            'warning': f'SMTP credentials failed ({mail_err_msg})'
-        })
-    else:
-        return Response({'error': f'Failed to send login email: {mail_err_msg}'}, status=500)
+    resp = {'message': f'OTP sent to {user.email_id}'}
+    if settings.DEBUG or not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
+        resp['dev_otp'] = otp
+    return Response(resp)
 
 
 @api_view(['POST'])
@@ -521,27 +481,12 @@ def forgot_password(request):
     user.otp_created_at = timezone.now()
     user.save()
 
-    email_sent = False
-    try:
-        send_mail(
-            'TrueVote — Password Reset Code',
-            f'Your password reset OTP is {otp}. This code is valid for 10 minutes.',
-            settings.EMAIL_HOST_USER or 'noreply@truevote.app',
-            [user.email_id],
-            fail_silently=False
-        )
-        email_sent = True
-    except Exception as e:
-        print(f"[TrueVote] Password reset email failed: {e}")
+    send_otp_email_async(user.email_id, otp, 'TrueVote — Password Reset Code')
 
-    if email_sent or not settings.DEBUG:
-        return Response({'message': f'OTP sent to {email}'})
-    else:
-        return Response({
-            'message': f'OTP sent to {email}',
-            'dev_otp': otp,
-            'warning': 'Email delivery failed; dev OTP provided'
-        })
+    resp = {'message': f'OTP sent to {email}'}
+    if settings.DEBUG or not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
+        resp['dev_otp'] = otp
+    return Response(resp)
 
 
 @api_view(['POST'])

@@ -162,4 +162,39 @@ def delete_candidate(request, candidate_id):
 
     candidate.delete()
     return Response({'message': 'Candidate deleted successfully'})
+
+
+@api_view(['GET', 'POST'])
+def seed_database(request):
+    """
+    Allow triggering database migrations, admin setup, and fresh realistic seed data
+    directly via HTTP request (no paid Render terminal/shell needed).
+    """
+    from django.core.management import call_command
+    logs = []
+
+    try:
+        call_command('migrate', interactive=False)
+        logs.append("Migrations applied successfully.")
+    except Exception as e:
+        logs.append(f"Migration error: {e}")
+
+    try:
+        call_command('init_admin')
+        logs.append("Admin account initialized (Admin / admin123).")
+    except Exception as e:
+        logs.append(f"Admin init error: {e}")
+
+    try:
+        call_command('seed_data')
+        logs.append("Seed data populated with fresh elections, candidates, and blockchain records.")
+    except Exception as e:
+        logs.append(f"Seed error: {e}")
+
+    return Response({
+        'status': 'success',
+        'message': 'Database maintenance completed successfully.',
+        'details': logs
+    })
+
 

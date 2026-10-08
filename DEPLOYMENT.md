@@ -52,11 +52,14 @@ You can get a free managed PostgreSQL database from **[Neon.tech](https://neon.t
    - `EMAIL_HOST_USER`: *(Your Gmail address for OTPs)*
    - `EMAIL_HOST_PASSWORD`: *(Your 16-character Google App Password)*
 5. Click **Create Web Service**.
-6. Once deployed, open the Render **Shell** tab and run:
-   ```bash
-   python manage.py seed_data
-   ```
-   *(This populates the database with fresh elections, candidates, and sample data!)*
+6. **Automatic Migration & Initial Seeding**:
+   - The backend is configured to **automatically run migrations, initialize the admin account (`Admin` / `admin123`), and populate initial elections** directly inside `wsgi.py` on container startup!
+   - You **do NOT need Render's paid Shell feature**!
+   - If you ever want to re-seed or reset sample elections, simply visit this URL in your web browser:
+     ```text
+     https://your-backend.onrender.com/api/elections/seed-data/
+     ```
+     This triggers migrations, creates the admin user, and loads realistic sample data in seconds.
 
 ---
 
