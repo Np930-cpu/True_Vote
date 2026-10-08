@@ -21,40 +21,50 @@ from .email_service import send_otp_email_async
 @api_view(['POST'])
 def register_voter(request):
     data = request.data
-    voter_id = data.get('voter_id')
-    name     = data.get('name')
+    voter_id = str(data.get('voter_id') or '').strip()
+    name     = str(data.get('name') or '').strip()
     age      = data.get('age')
-    email_id = data.get('email_id')
+    email_id = str(data.get('email_id') or '').strip().lower()
 
-    if not name:
-        return Response({"error": "Name is required"}, status=400)
-    if not age:
-        return Response({"error": "Age is required"}, status=400)
-    if not voter_id:
-        return Response({"error": "Voter ID is required"}, status=400)
-    if not email_id:
-        return Response({"error": "Email ID is required"}, status=400)
-    if Voters.objects.filter(voter_id=voter_id).exists():
+    if not name or len(name) < 2:
+        return Response({"error": "Full name (at least 2 characters) is required"}, status=400)
+    if not voter_id or len(voter_id) < 3:
+        return Response({"error": "Voter ID (at least 3 characters) is required"}, status=400)
+    if not email_id or '@' not in email_id or '.' not in email_id:
+        return Response({"error": "A valid email address is required"}, status=400)
+
+    try:
+        age_int = int(age)
+        if age_int < 18:
+            return Response({"error": "You must be at least 18 years old to register as a voter."}, status=400)
+        if age_int > 120:
+            return Response({"error": "Please enter a valid age."}, status=400)
+    except (ValueError, TypeError):
+        return Response({"error": "Valid age (integer >= 18) is required"}, status=400)
+
+    if Voters.objects.filter(voter_id__iexact=voter_id).exists():
         return Response({"error": "Voter ID already registered"}, status=400)
-    if Voters.objects.filter(email_id=email_id).exists():
+    if Voters.objects.filter(email_id__iexact=email_id).exists():
         return Response({"error": "Email already registered"}, status=400)
 
-    # Store in cache â€” NOT in DB yet
+    # Store strictly in cache — NEVER in DB until all 3 steps succeed
     cache.set(f'pending_reg_{voter_id}', {
         'voter_id': voter_id,
         'name': name,
-        'age': age,
+        'age': age_int,
         'email_id': email_id,
+        'step1_completed': True,
         'otp_verified': False,
+        'created_at': timezone.now().isoformat(),
     }, timeout=3600)
 
-    return Response({"message": "Details saved. Please verify your email."})
+    return Response({"message": "Details verified. Please verify your email with the OTP."})
 
 
 @api_view(['POST'])
 def send_otp(request):
-    email    = request.data.get('email') or request.data.get('email_id')
-    voter_id = request.data.get('voter_id')
+    email    = str(request.data.get('email') or request.data.get('email_id') or '').strip().lower()
+    voter_id = str(request.data.get('voter_id') or '').strip()
 
     if not email and not voter_id:
         return Response({'error': 'Email or Voter ID required'}, status=400)
@@ -62,10 +72,11 @@ def send_otp(request):
     # Check pending registration first
     if voter_id:
         pending = cache.get(f'pending_reg_{voter_id}')
-        if pending:
+        if pending and pending.get('step1_completed'):
             otp = f"{secrets.randbelow(900000) + 100000}"
             pending['otp'] = otp
             pending['otp_created_at'] = timezone.now().isoformat()
+            pending['otp_verified'] = False
             cache.set(f'pending_reg_{voter_id}', pending, timeout=3600)
 
             target_email = pending['email_id']
@@ -77,11 +88,11 @@ def send_otp(request):
     # Fallback for existing users
     try:
         if email:
-            user = Voters.objects.get(email_id=email)
+            user = Voters.objects.get(email_id__iexact=email)
         else:
-            user = Voters.objects.get(voter_id=voter_id)
+            user = Voters.objects.get(voter_id__iexact=voter_id)
     except Voters.DoesNotExist:
-        return Response({'error': 'User not found'}, status=404)
+        return Response({'error': 'Registration session not found or voter not registered. Please complete Step 1 first.'}, status=404)
 
     otp = f"{secrets.randbelow(900000) + 100000}"
     user.otp = otp
@@ -96,39 +107,50 @@ def send_otp(request):
 
 @api_view(['POST'])
 def verify_otp(request):
-    voter_id = request.data.get('voter_id')
-    email    = request.data.get('email')
-    otp      = request.data.get('otp')
+    voter_id = str(request.data.get('voter_id') or '').strip()
+    email    = str(request.data.get('email') or '').strip().lower()
+    otp      = str(request.data.get('otp') or '').strip()
+
+    if not otp:
+        return Response({'error': 'OTP code is required'}, status=400)
 
     # Check pending registration
     if voter_id:
         pending = cache.get(f'pending_reg_{voter_id}')
         if pending:
-            if pending.get('otp') != str(otp):
-                return Response({'error': 'Invalid OTP'}, status=400)
+            if pending.get('otp') != otp:
+                return Response({'error': 'Invalid OTP code. Please check your email and try again.'}, status=400)
 
             from datetime import datetime
-            otp_created = datetime.fromisoformat(pending['otp_created_at'])
-            if timezone.now() > timezone.make_aware(otp_created.replace(tzinfo=None)) + timedelta(minutes=2) if otp_created.tzinfo is None else timezone.now() > otp_created + timedelta(minutes=2):
-                cache.delete(f'pending_reg_{voter_id}')
-                return Response({'error': 'OTP has expired. Please start registration again.'}, status=400)
+            otp_created_str = pending.get('otp_created_at')
+            if not otp_created_str:
+                return Response({'error': 'OTP has expired. Please request a new one.'}, status=400)
+
+            otp_created = datetime.fromisoformat(otp_created_str)
+            if otp_created.tzinfo is None:
+                otp_created = timezone.make_aware(otp_created)
+            if timezone.now() > otp_created + timedelta(minutes=2):
+                pending.pop('otp', None)
+                pending.pop('otp_created_at', None)
+                cache.set(f'pending_reg_{voter_id}', pending, timeout=3600)
+                return Response({'error': 'OTP has expired (valid for 2 minutes). Please request a new one.'}, status=400)
 
             pending['otp_verified'] = True
             pending.pop('otp', None)
             pending.pop('otp_created_at', None)
             cache.set(f'pending_reg_{voter_id}', pending, timeout=3600)
-            return Response({'message': 'OTP verified'})
+            return Response({'message': 'Email verified successfully. Proceed to face registration.'})
 
     # Fallback for existing users
     try:
         if voter_id:
-            user = Voters.objects.get(voter_id=voter_id)
+            user = Voters.objects.get(voter_id__iexact=voter_id)
         elif email:
-            user = Voters.objects.get(email_id=email)
+            user = Voters.objects.get(email_id__iexact=email)
         else:
             return Response({'error': 'voter_id or email required'}, status=400)
 
-        if user.otp == str(otp):
+        if user.otp == otp:
             if user.otp_created_at and timezone.now() > user.otp_created_at + timedelta(minutes=2):
                 user.otp = None
                 user.otp_created_at = None
@@ -140,74 +162,90 @@ def verify_otp(request):
             user.save()
             return Response({'message': 'OTP verified'})
         else:
-            return Response({'error': 'Invalid OTP'})
+            return Response({'error': 'Invalid OTP code'}, status=400)
 
     except Voters.DoesNotExist:
-        return Response({'error': 'User not found'})
+        return Response({'error': 'Registration session not found. Please start registration from Step 1.'}, status=404)
 
 
 @api_view(['POST'])
 def complete_registration(request):
     """
-    Called after face registration succeeds.
-    Creates the actual DB record only now.
+    Guarantees user is NEVER registered in DB unless ALL 3 steps are complete:
+    Step 1: Details (in pending cache)
+    Step 2: Email OTP verified (pending['otp_verified'] == True)
+    Step 3: Face frames captured (dataset exists with >= 3 valid frames)
     """
-    voter_id = request.data.get('voter_id')
+    voter_id = str(request.data.get('voter_id') or '').strip()
     if not voter_id:
         return Response({'error': 'voter_id required'}, status=400)
 
     pending = cache.get(f'pending_reg_{voter_id}')
-    if not pending:
-        return Response({'error': 'Registration session expired. Please start again.'}, status=400)
+    if not pending or not pending.get('step1_completed'):
+        return Response({'error': 'Registration session expired or not found. Please start from Step 1.'}, status=400)
 
     if not pending.get('otp_verified'):
-        return Response({'error': 'Email not verified. Complete OTP verification first.'}, status=403)
+        return Response({'error': 'Email not verified. Complete Step 2 OTP verification first.'}, status=403)
 
-    if Voters.objects.filter(voter_id=voter_id).exists():
+    # Check that Step 3 face biometric was captured
+    import os
+    from django.conf import settings
+    dataset_path = os.path.join(settings.BASE_DIR, 'face_auth', 'dataset', str(voter_id))
+    if not os.path.isdir(dataset_path) or len(os.listdir(dataset_path)) < 3:
+        return Response({'error': 'Face biometric not registered. Complete Step 3 face capture first.'}, status=400)
+
+    if Voters.objects.filter(voter_id__iexact=voter_id).exists():
         cache.delete(f'pending_reg_{voter_id}')
         return Response({'error': 'Voter ID already registered'}, status=400)
 
-    if Voters.objects.filter(email_id=pending['email_id']).exists():
+    if Voters.objects.filter(email_id__iexact=pending['email_id']).exists():
         cache.delete(f'pending_reg_{voter_id}')
         return Response({'error': 'Email already registered'}, status=400)
 
-    Voters.objects.create_user(
-        voter_id=pending['voter_id'],
-        password=None,
-        name=pending['name'],
-        age=pending['age'],
-        email_id=pending['email_id'],
-        otp_verified=True,
-        is_verified=True,
-    )
+    try:
+        Voters.objects.create_user(
+            voter_id=pending['voter_id'],
+            password=None,
+            name=pending['name'],
+            age=pending['age'],
+            email_id=pending['email_id'],
+            otp_verified=True,
+            is_verified=True,
+            is_active=True,
+        )
+        cache.delete(f'pending_reg_{voter_id}')
+    except Exception as e:
+        return Response({'error': f'Failed to create voter: {str(e)}'}, status=500)
 
-    cache.delete(f'pending_reg_{voter_id}')
-    return Response({'message': 'Registration complete'})
+    return Response({'message': 'Registration completed successfully'})
 
 
 @api_view(['POST'])
 def send_login_otp(request):
-    voter_id = request.data.get('voter_id')
+    voter_id = str(request.data.get('voter_id') or '').strip()
     if not voter_id:
         return Response({'error': 'Voter ID is required'}, status=400)
 
     try:
-        user = Voters.objects.get(voter_id=voter_id)
+        user = Voters.objects.get(voter_id__iexact=voter_id)
     except Voters.DoesNotExist:
         return Response({'error': 'Voter ID not found'}, status=404)
 
     if not user.is_active:
         return Response({'error': 'This voter account has been deactivated.'}, status=403)
 
-    import os
-    from django.conf import settings
-    dataset_path = os.path.join(settings.BASE_DIR, 'face_auth', 'dataset', str(user.voter_id))
-    face_registered = os.path.isdir(dataset_path) and len(os.listdir(dataset_path)) > 0
+    if not user.is_verified:
+        return Response({'error': 'Voter registration is incomplete. Please complete all 3 steps to register.'}, status=403)
 
     if not user.otp_verified:
         return Response({'error': 'Email not verified. Please complete registration first.'}, status=403)
+
+    import os
+    from django.conf import settings
+    dataset_path = os.path.join(settings.BASE_DIR, 'face_auth', 'dataset', str(user.voter_id))
+    face_registered = os.path.isdir(dataset_path) and len(os.listdir(dataset_path)) >= 3
     if not face_registered:
-        return Response({'error': 'Face not registered. Please complete registration first.'}, status=403)
+        return Response({'error': 'Face biometric not registered. Please complete registration first.'}, status=403)
 
     otp = f"{secrets.randbelow(900000) + 100000}"
     user.otp = otp
@@ -222,18 +260,24 @@ def send_login_otp(request):
 
 @api_view(['POST'])
 def verify_login_otp(request):
-    voter_id = request.data.get('voter_id')
-    otp      = request.data.get('otp')
+    voter_id = str(request.data.get('voter_id') or '').strip()
+    otp      = str(request.data.get('otp') or '').strip()
 
     if not voter_id or not otp:
         return Response({'error': 'Voter ID and OTP are required'}, status=400)
 
     try:
-        user = Voters.objects.get(voter_id=voter_id)
+        user = Voters.objects.get(voter_id__iexact=voter_id)
     except Voters.DoesNotExist:
         return Response({'error': 'Voter ID not found'}, status=404)
 
-    if user.otp != str(otp):
+    if not user.is_active:
+        return Response({'error': 'This voter account has been deactivated.'}, status=403)
+
+    if not user.is_verified:
+        return Response({'error': 'Voter registration is incomplete.'}, status=403)
+
+    if user.otp != otp:
         return Response({'error': 'Invalid OTP'}, status=400)
 
     if user.otp_created_at and timezone.now() > user.otp_created_at + timedelta(minutes=2):

@@ -14,26 +14,57 @@ export default function Register() {
     try { return JSON.parse(sessionStorage.getItem(SESSION_KEY)) || {}; } catch { return {}; }
   })();
 
-  const [step, setStep] = useState(saved.step || 1);
   const [form, setForm] = useState(saved.form || { voter_id: '', name: '', age: '', email_id: '' });
+  const [step2Verified, setStep2Verified] = useState(saved.step2_verified || false);
+  const [step, setStep] = useState(() => {
+    if (saved.step === 3 && saved.form?.voter_id && saved.step2_verified) return 3;
+    if (saved.step === 2 && saved.form?.voter_id) return 2;
+    return 1;
+  });
   const [otp, setOtp] = useState('');
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
 
-  // Persist step + form whenever they change
+  // Persist step + form + verified flag whenever they change
   useEffect(() => {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ step, form }));
-  }, [step, form]);
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ step, form, step2_verified: step2Verified }));
+  }, [step, form, step2Verified]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleRegister = async (e) => {
     e.preventDefault(); setLoading(true); setMsg({});
+
+    const trimmedForm = {
+      voter_id: (form.voter_id || '').trim(),
+      name: (form.name || '').trim(),
+      age: parseInt(form.age, 10),
+      email_id: (form.email_id || '').trim().toLowerCase(),
+    };
+
+    if (trimmedForm.name.length < 2) {
+      setMsg({ type: 'error', text: 'Please enter your full name (at least 2 characters).' });
+      setLoading(false);
+      return;
+    }
+    if (trimmedForm.voter_id.length < 3) {
+      setMsg({ type: 'error', text: 'Voter ID must be at least 3 characters long.' });
+      setLoading(false);
+      return;
+    }
+    if (!trimmedForm.age || trimmedForm.age < 18) {
+      setMsg({ type: 'error', text: 'You must be at least 18 years old to register.' });
+      setLoading(false);
+      return;
+    }
+
     try {
-      await registerVoter(form);
-      const res = await sendOtp({ voter_id: form.voter_id, email: form.email_id });
+      await registerVoter(trimmedForm);
+      const res = await sendOtp({ voter_id: trimmedForm.voter_id, email: trimmedForm.email_id });
+      setForm(trimmedForm);
       setOtp('');
-      setMsg({ type: 'success', text: res.data?.message || `OTP sent to ${form.email_id}. Please check your email inbox.` });
+      setStep2Verified(false);
+      setMsg({ type: 'success', text: res.data?.message || `OTP sent to ${trimmedForm.email_id}. Please check your email inbox.` });
       setStep(2);
     } catch (err) {
       let errorText = err.response?.data?.error || err.response?.data?.message;
@@ -63,9 +94,16 @@ export default function Register() {
 
   const handleOtp = async (e) => {
     e.preventDefault(); setLoading(true); setMsg({});
+    const cleanOtp = (otp || '').trim();
+    if (cleanOtp.length !== 6) {
+      setMsg({ type: 'error', text: 'Please enter a valid 6-digit verification code.' });
+      setLoading(false);
+      return;
+    }
     try {
-      await verifyOtp({ voter_id: form.voter_id, otp });
-      setMsg({ type: 'success', text: 'Email verified successfully!' });
+      await verifyOtp({ voter_id: form.voter_id, otp: cleanOtp });
+      setStep2Verified(true);
+      setMsg({ type: 'success', text: 'Email verified successfully! Proceeding to face setup.' });
       setStep(3);
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.error || 'OTP verification failed. Please try again.' });
@@ -88,7 +126,7 @@ export default function Register() {
         </div>
         <div style={{ marginTop: '2rem', padding: '1rem', background: 'rgba(59,110,248,0.05)', border: '1px solid rgba(59,110,248,0.15)', borderRadius: 'var(--r-sm)' }}>
           <p style={{ fontSize: '0.78rem', color: 'var(--ink2)', lineHeight: 1.6 }}>
-            Your account is <strong style={{ color: 'var(--ink)' }}>not created</strong> until all three steps are complete. Incomplete registrations are discarded automatically.
+            Your account is <strong style={{ color: 'var(--ink)' }}>not registered in the database</strong> until all three steps are successfully completed. Incomplete registrations are discarded automatically.
           </p>
         </div>
       </div>
@@ -115,7 +153,7 @@ export default function Register() {
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>Age</label>
-                  <input type="number" value={form.age} onChange={e => set('age', e.target.value)} placeholder="18" min="18" required />
+                  <input type="number" value={form.age} onChange={e => set('age', e.target.value)} placeholder="18" min="18" max="120" required />
                 </div>
               </div>
               <div className="form-group" style={{ marginTop: '0.75rem' }}>
@@ -152,7 +190,7 @@ export default function Register() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
+                  onClick={() => { setStep(1); setStep2Verified(false); }}
                   style={{ background: 'none', border: 'none', color: 'var(--ink2)', cursor: 'pointer', padding: 0 }}
                 >
                   ← Edit details
@@ -170,15 +208,20 @@ export default function Register() {
           )}
 
           {step === 3 && (
-            <FaceCapture
-              userId={form.voter_id}
-              onSuccess={() => {
-                sessionStorage.removeItem(SESSION_KEY);
-                setMsg({ type: 'success', text: 'Registration complete! Redirecting to login…' });
-                setTimeout(() => navigate('/login'), 2000);
-              }}
-              onError={(err) => setMsg({ type: 'error', text: err || 'Face registration failed.' })}
-            />
+            <div>
+              <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(59,110,248,0.06)', borderRadius: 'var(--r-sm)', fontSize: '0.82rem', color: 'var(--ink2)', lineHeight: 1.5 }}>
+                🔒 <strong>Final Step:</strong> Please look into your camera to register your biometric face profile. Your voter account will only be activated and created in the system after this step completes successfully.
+              </div>
+              <FaceCapture
+                userId={form.voter_id}
+                onSuccess={() => {
+                  sessionStorage.removeItem(SESSION_KEY);
+                  setMsg({ type: 'success', text: 'Registration complete! All steps verified. Redirecting to login…' });
+                  setTimeout(() => navigate('/login'), 2200);
+                }}
+                onError={(err) => setMsg({ type: 'error', text: err || 'Face registration failed.' })}
+              />
+            </div>
           )}
 
           <div className="switch-link">

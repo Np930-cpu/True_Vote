@@ -72,7 +72,7 @@ export default function Login() {
           {[
             { icon: '🔒', text: 'No password needed' },
             { icon: '📧', text: 'OTP sent to registered email' },
-            { icon: '⏱️', text: 'Code expires in 10 minutes' },
+            { icon: '⏱️', text: 'Code expires in 2 minutes' },
           ].map((t, i) => (
             <div className="trust-item" key={i}>
               <span>{t.icon}</span>

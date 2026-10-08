@@ -50,21 +50,29 @@ def get_loaded_face_model():
 
 @api_view(['POST'])
 def save_face_frames_batch(request):
-    user_id = request.data.get('user_id')
+    user_id = str(request.data.get('user_id') or '').strip()
     frames = request.data.get('frames', [])
 
     if not user_id or not frames:
         return Response({'error': 'user_id and frames required'}, status=400)
 
+    # 1. Block if this voter is already fully registered in database
+    from users.models import Voters
+    if Voters.objects.filter(voter_id__iexact=user_id, is_verified=True).exists():
+        return Response({'error': 'Face already registered for this voter ID.'}, status=400)
+
+    # 2. Strict check: Step 1 and Step 2 MUST be completed before capturing face
+    from django.core.cache import cache
+    pending = cache.get(f'pending_reg_{user_id}')
+    if not pending or not pending.get('step1_completed'):
+        return Response({'error': 'Registration session expired or not found. Please start from Step 1.'}, status=403)
+    if not pending.get('otp_verified'):
+        return Response({'error': 'Email OTP not verified. Please complete Step 2 before face capture.'}, status=403)
+
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     model_path  = os.path.join(BASE_DIR, 'face_auth', 'model', 'face_model.yml')
     labels_path = os.path.join(BASE_DIR, 'face_auth', 'model', 'labels.json')
     save_path   = os.path.join(BASE_DIR, 'face_auth', 'dataset', str(user_id))
-
-    # Block only if this voter has already completed full registration
-    from users.models import Voters
-    if Voters.objects.filter(voter_id=user_id, is_verified=True).exists():
-        return Response({'error': 'Face already registered for this voter ID.'}, status=400)
 
     # Reset any partial dataset from previous incomplete attempts
     if os.path.isdir(save_path):
@@ -131,12 +139,23 @@ def save_face_frames_batch(request):
 
 @api_view(['POST'])
 def save_face_frame(request):
-    user_id = request.data.get('user_id')
+    user_id = str(request.data.get('user_id') or '').strip()
     frame_b64 = request.data.get('frame')
     index = request.data.get('index', 0)
 
     if not user_id or not frame_b64:
         return Response({'error': 'user_id and frame required'}, status=400)
+
+    from users.models import Voters
+    if Voters.objects.filter(voter_id__iexact=user_id, is_verified=True).exists():
+        return Response({'error': 'Face already registered for this voter ID.'}, status=400)
+
+    from django.core.cache import cache
+    pending = cache.get(f'pending_reg_{user_id}')
+    if not pending or not pending.get('step1_completed'):
+        return Response({'error': 'Registration session expired or not found. Please start from Step 1.'}, status=403)
+    if not pending.get('otp_verified'):
+        return Response({'error': 'Email OTP not verified. Please complete Step 2 before face capture.'}, status=403)
 
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     model_path  = os.path.join(BASE_DIR, 'face_auth', 'model', 'face_model.yml')
@@ -220,57 +239,84 @@ def recognize_from_frame(request):
     user_id = label_map.get(str(label))
 
     # LBPH confidence is a distance — lower is better. < 100 is a reliable match.
-    if confidence < 100:
-        return Response({'message': 'Authenticated', 'user_id': user_id, 'confidence': confidence})
+    if confidence < 100 and user_id:
+        from users.models import Voters
+        try:
+            matched_voter = Voters.objects.get(voter_id__iexact=user_id)
+            if not matched_voter.is_active:
+                return Response({'error': 'This voter account has been deactivated.'}, status=403)
+            if not matched_voter.is_verified:
+                return Response({'error': 'Voter registration is incomplete.'}, status=403)
+            return Response({'message': 'Authenticated', 'user_id': user_id, 'confidence': confidence})
+        except Voters.DoesNotExist:
+            return Response({'error': 'Recognized voter ID not found in database.'}, status=404)
 
     return Response({'error': 'Face not recognized'}, status=400)
 
 
 @api_view(['POST'])
 def register_face(request):
-    user_id = request.data.get('user_id')
+    user_id = str(request.data.get('user_id') or '').strip()
     if not user_id:
         return Response({'error': 'user_id is required'}, status=400)
+
+    # 1. Block if user is already verified in DB
+    from users.models import Voters
+    if Voters.objects.filter(voter_id__iexact=user_id, is_verified=True).exists():
+        return Response({'error': 'Voter is already fully registered and verified.'}, status=400)
 
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     dataset_path = os.path.join(BASE_DIR, 'face_auth', 'dataset', str(user_id))
 
-    if not os.path.isdir(dataset_path) or len(os.listdir(dataset_path)) == 0:
-        return Response({'error': 'No face frames found. Please capture your face first.'}, status=400)
+    # 2. Strict check: Step 1 & Step 2 MUST be completed in cache
+    from django.core.cache import cache
+    pending = cache.get(f'pending_reg_{user_id}')
+    if not pending or not pending.get('step1_completed'):
+        shutil.rmtree(dataset_path, ignore_errors=True)
+        return Response({'error': 'Registration session expired or not found. Please start from Step 1.'}, status=400)
 
+    if not pending.get('otp_verified'):
+        shutil.rmtree(dataset_path, ignore_errors=True)
+        return Response({'error': 'Email OTP not verified. Please complete Step 2 before face registration.'}, status=403)
+
+    # 3. Strict check: Step 3 face frames MUST be captured (minimum 3 valid frames)
+    if not os.path.isdir(dataset_path) or len(os.listdir(dataset_path)) < 3:
+        return Response({'error': 'Insufficient face frames captured (minimum 3 required). Please capture your face again.'}, status=400)
+
+    # 4. Train model with the new dataset
     train_model()
     global _CACHED_MTIME
     _CACHED_MTIME = 0
 
-    # Final duplicate check after training with the new data included
+    # 5. Final duplicate check: ensure face does not match another registered voter
     is_duplicate, matched_user = check_face_duplicate(user_id)
     if is_duplicate:
         shutil.rmtree(dataset_path, ignore_errors=True)
         train_model()
+        _CACHED_MTIME = 0
         return Response(
-            {'error': 'Face already registered to another voter. Registration denied.'},
+            {'error': f'Face is already registered to another voter ({matched_user}). Duplicate registration denied.'},
             status=400
         )
 
+    # 6. ATOMIC CREATION: All 3 steps are complete and verified.
+    # ONLY now is the voter record created in the database.
     try:
-        from users.models import Voters
-        voter = Voters.objects.get(voter_id=user_id)
-        if not voter.otp_verified:
-            return Response({'error': 'OTP not verified. Complete email verification first.'}, status=403)
-        voter.is_verified = True
-        voter.save()
-    except Voters.DoesNotExist:
-        # Voter not in DB yet — complete registration now
-        from django.core.cache import cache
-        pending = cache.get(f'pending_reg_{user_id}')
-        if not pending:
+        if Voters.objects.filter(voter_id__iexact=pending['voter_id']).exists():
             shutil.rmtree(dataset_path, ignore_errors=True)
-            return Response({'error': 'Registration session expired. Please start again.'}, status=400)
-        if not pending.get('otp_verified'):
+            train_model()
+            _CACHED_MTIME = 0
+            cache.delete(f'pending_reg_{user_id}')
+            return Response({'error': 'Voter ID is already registered.'}, status=400)
+
+        if Voters.objects.filter(email_id__iexact=pending['email_id']).exists():
             shutil.rmtree(dataset_path, ignore_errors=True)
-            return Response({'error': 'Email not verified. Complete OTP verification first.'}, status=403)
-        from users.models import Voters
-        Voters.objects.create_user(
+            train_model()
+            _CACHED_MTIME = 0
+            cache.delete(f'pending_reg_{user_id}')
+            return Response({'error': 'Email is already registered.'}, status=400)
+
+        voter = Voters.objects.create_user(
             voter_id=pending['voter_id'],
             password=None,
             name=pending['name'],
@@ -278,17 +324,30 @@ def register_face(request):
             email_id=pending['email_id'],
             otp_verified=True,
             is_verified=True,
+            is_active=True,
         )
         cache.delete(f'pending_reg_{user_id}')
-    except Exception:
-        pass
+    except Exception as e:
+        shutil.rmtree(dataset_path, ignore_errors=True)
+        train_model()
+        _CACHED_MTIME = 0
+        return Response({'error': f'Failed to create voter record: {str(e)}'}, status=500)
 
-    return Response({'message': 'Face Registered'})
+    return Response({'message': 'Registration completed successfully! All steps verified.'})
 
 
 @api_view(['GET'])
 def face_login(request):
     user = recognize_face()
     if user is not None:
-        return Response({'message': 'Authenticated', 'user_id': user})
-    return Response({'error': 'Face not recognized'})
+        from users.models import Voters
+        try:
+            matched_voter = Voters.objects.get(voter_id__iexact=user)
+            if not matched_voter.is_active:
+                return Response({'error': 'This voter account has been deactivated.'}, status=403)
+            if not matched_voter.is_verified:
+                return Response({'error': 'Voter registration is incomplete.'}, status=403)
+            return Response({'message': 'Authenticated', 'user_id': user})
+        except Voters.DoesNotExist:
+            return Response({'error': 'Recognized voter not found in database.'}, status=404)
+    return Response({'error': 'Face not recognized'}, status=400)

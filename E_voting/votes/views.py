@@ -23,11 +23,15 @@ def cast_vote(request):
     if not user.is_active:
         return Response({'error': 'This voter account has been deactivated.'}, status=403)
 
+    if not user.is_verified:
+        return Response({'error': 'Voter registration is incomplete. Voting denied.'}, status=403)
+
+    if not user.otp_verified:
+        return Response({'error': 'OTP not verified'}, status=400)
+
     face_verified = request.data.get('face_verified', False)
     if not face_verified:
         return Response({'error': 'Face authentication required.'}, status=400)
-    if not user.otp_verified:
-        return Response({'error': 'OTP not verified'}, status=400)
 
     candidate_id = request.data.get('candidate')
     if not candidate_id:
