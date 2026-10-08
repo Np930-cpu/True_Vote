@@ -32,12 +32,8 @@ export default function Register() {
     try {
       await registerVoter(form);
       const res = await sendOtp({ voter_id: form.voter_id, email: form.email_id });
-      if (res.data?.dev_otp) {
-        setOtp(res.data.dev_otp);
-        setMsg({ type: 'success', text: res.data.message || `Dev OTP: ${res.data.dev_otp}` });
-      } else {
-        setMsg({ type: 'success', text: `OTP sent to ${form.email_id}` });
-      }
+      setOtp('');
+      setMsg({ type: 'success', text: res.data?.message || `OTP sent to ${form.email_id}. Please check your email inbox.` });
       setStep(2);
     } catch (err) {
       let errorText = err.response?.data?.error || err.response?.data?.message;
@@ -57,12 +53,8 @@ export default function Register() {
     setLoading(true); setMsg({});
     try {
       const res = await sendOtp({ voter_id: form.voter_id, email: form.email_id });
-      if (res.data?.dev_otp) {
-        setOtp(res.data.dev_otp);
-        setMsg({ type: 'success', text: res.data.message || `New Dev OTP: ${res.data.dev_otp}` });
-      } else {
-        setMsg({ type: 'success', text: `New OTP sent to ${form.email_id}` });
-      }
+      setOtp('');
+      setMsg({ type: 'success', text: res.data?.message || `New OTP sent to ${form.email_id}. Please check your inbox.` });
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.error || 'Failed to resend OTP.' });
     }
@@ -143,7 +135,7 @@ export default function Register() {
           {step === 2 && (
             <form onSubmit={handleOtp}>
               <p style={{ color: 'var(--ink2)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: 1.6 }}>
-                We sent a 6-digit verification code to <strong style={{ color: 'var(--blue)' }}>{form.email_id}</strong>
+                We sent a 6-digit verification code to <strong style={{ color: 'var(--blue)' }}>{form.email_id}</strong>. Please check your inbox (and spam folder) and enter the code below.
               </p>
               <div className="form-group">
                 <label>Verification Code</label>
@@ -151,22 +143,9 @@ export default function Register() {
                   value={otp} onChange={e => setOtp(e.target.value)}
                   placeholder="000000" maxLength={6} required
                   style={{ fontSize: '1.6rem', letterSpacing: '0.6rem', textAlign: 'center', fontFamily: 'monospace' }}
+                  autoFocus
                 />
               </div>
-              {otp && (
-                <div style={{
-                  background: 'rgba(37,99,235,0.08)',
-                  border: '1px solid rgba(37,99,235,0.2)',
-                  borderRadius: 'var(--r-sm)',
-                  padding: '0.6rem 0.8rem',
-                  marginBottom: '1rem',
-                  fontSize: '0.82rem',
-                  color: 'var(--blue)',
-                  textAlign: 'center'
-                }}>
-                  Verification Code: <strong style={{ letterSpacing: '2px' }}>{otp}</strong> (auto-filled)
-                </div>
-              )}
               <button className="btn btn-primary btn-full" disabled={loading} style={{ marginBottom: '0.75rem' }}>
                 {loading ? 'Verifying…' : 'Verify Code'}
               </button>

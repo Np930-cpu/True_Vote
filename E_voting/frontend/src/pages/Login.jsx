@@ -30,10 +30,8 @@ export default function Login() {
     try {
       const res = await sendLoginOtp({ voter_id: voterId });
       setMaskedEmail(res.data.message);
-      if (res.data?.dev_otp) {
-        setOtp(res.data.dev_otp);
-        setMsg({ type: 'success', text: res.data.message || `Dev Mode: OTP is ${res.data.dev_otp}` });
-      }
+      setOtp('');
+      setMsg({ type: 'success', text: res.data.message || 'OTP sent to your registered email. Please check your inbox.' });
       setStep(2);
     } catch (err) {
       let error = err.response?.data?.error || err.response?.data?.message;

@@ -17,7 +17,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: ALLOW_DEV_OTP
-        value: "True"
+        value: "False"
       - key: RESEND_API_KEY
         sync: false
       - key: BREVO_API_KEY

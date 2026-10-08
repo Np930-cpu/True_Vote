@@ -145,7 +145,7 @@ EMAIL_TIMEOUT = 5
 
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
-ALLOW_DEV_OTP = os.environ.get('ALLOW_DEV_OTP', 'True').lower() in ('true', '1', 't')
+ALLOW_DEV_OTP = os.environ.get('ALLOW_DEV_OTP', 'False').lower() in ('true', '1', 't')
 
 cors_allow_all = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True').lower() in ('true', '1', 't')
 CORS_ALLOW_ALL_ORIGINS = cors_allow_all

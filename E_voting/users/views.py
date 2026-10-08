@@ -15,7 +15,7 @@ from django.conf import settings
 from .models import Voters
 
 
-from .email_service import send_otp_email_async, should_provide_dev_otp
+from .email_service import send_otp_email_async
 
 
 @api_view(['POST'])
@@ -71,10 +71,7 @@ def send_otp(request):
             target_email = pending['email_id']
             send_otp_email_async(target_email, otp, 'TrueVote — Email Verification OTP')
 
-            resp = {'message': f'OTP sent to {target_email}'}
-            if should_provide_dev_otp():
-                resp['dev_otp'] = otp
-                resp['message'] = f'OTP sent to {target_email}. Verification code: {otp}'
+            resp = {'message': f'OTP sent to {target_email}. Please check your email inbox.'}
             return Response(resp)
 
     # Fallback for existing users
@@ -93,10 +90,7 @@ def send_otp(request):
 
     send_otp_email_async(user.email_id, otp, 'TrueVote — Email Verification OTP')
 
-    resp = {'message': f'OTP sent to {user.email_id}'}
-    if should_provide_dev_otp():
-        resp['dev_otp'] = otp
-        resp['message'] = f'OTP sent to {user.email_id}. Verification code: {otp}'
+    resp = {'message': f'OTP sent to {user.email_id}. Please check your email inbox.'}
     return Response(resp)
 
 
@@ -222,10 +216,7 @@ def send_login_otp(request):
 
     send_otp_email_async(user.email_id, otp, 'TrueVote — Login OTP')
 
-    resp = {'message': f'OTP sent to {user.email_id}'}
-    if should_provide_dev_otp():
-        resp['dev_otp'] = otp
-        resp['message'] = f'OTP sent to {user.email_id}. Verification code: {otp}'
+    resp = {'message': f'OTP sent to {user.email_id}. Please check your email inbox.'}
     return Response(resp)
 
 
@@ -465,10 +456,7 @@ def forgot_password(request):
 
     send_otp_email_async(user.email_id, otp, 'TrueVote — Password Reset Code')
 
-    resp = {'message': f'OTP sent to {email}'}
-    if should_provide_dev_otp():
-        resp['dev_otp'] = otp
-        resp['message'] = f'OTP sent to {email}. Reset code: {otp}'
+    resp = {'message': f'Password reset OTP sent to {email}. Please check your email inbox.'}
     return Response(resp)
 
 

@@ -1,9 +1,9 @@
 import os
 import json
 import urllib.request
+import threading
 from django.conf import settings
 from django.core.mail import send_mail
-import threading
 
 
 def send_otp_via_resend(recipient, otp, subject):
@@ -23,9 +23,10 @@ def send_otp_via_resend(recipient, otp, subject):
             <div style="margin: 20px 0; padding: 16px; background: #eff6ff; border-radius: 8px; text-align: center; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #1d4ed8;">
                 {otp}
             </div>
-            <p style="font-size: 13px; color: #64748b; line-height: 1.5;">This OTP code expires in 2 minutes. If you did not request this, please ignore this email.</p>
+            <p style="font-size: 13px; color: #64748b; line-height: 1.5;">This OTP code expires in 2 minutes. Enter this code on the website to verify your account.</p>
         </div>
-        '''
+        ''',
+        'text': f'Your TrueVote verification OTP is: {otp}. It expires in 2 minutes.'
     }).encode('utf-8')
 
     req = urllib.request.Request(
@@ -37,7 +38,7 @@ def send_otp_via_resend(recipient, otp, subject):
             'User-Agent': 'TrueVote/1.0',
         }
     )
-    with urllib.request.urlopen(req, timeout=8) as resp:
+    with urllib.request.urlopen(req, timeout=10) as resp:
         return resp.status in (200, 201)
 
 
@@ -51,8 +52,9 @@ def send_otp_via_brevo(recipient, otp, subject):
         or getattr(settings, 'EMAIL_HOST_USER', '')
         or 'noreply@truevote.app'
     )
+    sender_name = os.environ.get('BREVO_FROM_NAME', 'TrueVote')
     payload = json.dumps({
-        'sender': {'name': 'TrueVote', 'email': sender_email},
+        'sender': {'name': sender_name, 'email': sender_email},
         'to': [{'email': recipient}],
         'subject': subject,
         'htmlContent': f'''
@@ -62,9 +64,10 @@ def send_otp_via_brevo(recipient, otp, subject):
             <div style="margin: 20px 0; padding: 16px; background: #eff6ff; border-radius: 8px; text-align: center; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #1d4ed8;">
                 {otp}
             </div>
-            <p style="font-size: 13px; color: #64748b; line-height: 1.5;">This OTP code expires in 2 minutes. If you did not request this, please ignore this email.</p>
+            <p style="font-size: 13px; color: #64748b; line-height: 1.5;">This OTP code expires in 2 minutes. Enter this code on the website to verify your account.</p>
         </div>
-        '''
+        ''',
+        'textContent': f'Your TrueVote verification OTP is: {otp}. It expires in 2 minutes.'
     }).encode('utf-8')
 
     req = urllib.request.Request(
@@ -76,7 +79,7 @@ def send_otp_via_brevo(recipient, otp, subject):
             'User-Agent': 'TrueVote/1.0',
         }
     )
-    with urllib.request.urlopen(req, timeout=8) as resp:
+    with urllib.request.urlopen(req, timeout=10) as resp:
         return resp.status in (200, 201)
 
 
@@ -85,7 +88,7 @@ def send_otp_via_smtp(recipient, otp, subject):
         return False
     send_mail(
         subject,
-        f'Your OTP is {otp}. It expires in 2 minutes.',
+        f'Your TrueVote verification OTP is: {otp}\n\nIt expires in 2 minutes. Please enter this code on the website to verify your account.',
         settings.EMAIL_HOST_USER or 'noreply@truevote.app',
         [recipient],
         fail_silently=False
@@ -98,7 +101,7 @@ def deliver_otp(recipient_email, otp, subject='TrueVote — Verification OTP'):
     Attempts to deliver OTP email:
     1. Resend HTTPS API (works on Render free tier over port 443)
     2. Brevo HTTPS API (works on Render free tier over port 443)
-    3. Django SMTP (works locally or unblocked hosts)
+    3. Django SMTP (works locally or on unblocked hosts)
     """
     # 1. Resend API
     if os.environ.get('RESEND_API_KEY') or getattr(settings, 'RESEND_API_KEY', None):
@@ -107,7 +110,7 @@ def deliver_otp(recipient_email, otp, subject='TrueVote — Verification OTP'):
                 print(f"[TrueVote] ✅ OTP delivered via Resend API to {recipient_email}")
                 return True
         except Exception as e:
-            print(f"[TrueVote] ⚠️ Resend API delivery failed: {e}")
+            print(f"[TrueVote] ⚠️ Resend API delivery failed to {recipient_email}: {e}")
 
     # 2. Brevo API
     if os.environ.get('BREVO_API_KEY') or getattr(settings, 'BREVO_API_KEY', None):
@@ -116,9 +119,9 @@ def deliver_otp(recipient_email, otp, subject='TrueVote — Verification OTP'):
                 print(f"[TrueVote] ✅ OTP delivered via Brevo API to {recipient_email}")
                 return True
         except Exception as e:
-            print(f"[TrueVote] ⚠️ Brevo API delivery failed: {e}")
+            print(f"[TrueVote] ⚠️ Brevo API delivery failed to {recipient_email}: {e}")
 
-    # 3. SMTP
+    # 3. SMTP (Google Gmail / custom SMTP)
     if settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD:
         try:
             if send_otp_via_smtp(recipient_email, otp, subject):
@@ -127,26 +130,9 @@ def deliver_otp(recipient_email, otp, subject='TrueVote — Verification OTP'):
         except Exception as e:
             print(f"[TrueVote] ⚠️ SMTP delivery failed to {recipient_email}: {e}")
 
-    print(f"==================================================")
-    print(f"  🔐 FALLBACK OTP FOR {recipient_email}: {otp}")
-    print(f"==================================================")
+    print(f"[TrueVote] ❌ Failed to deliver OTP email to {recipient_email} across all channels.")
     return False
 
 
 def send_otp_email_async(recipient_email, otp, subject='TrueVote — Verification OTP'):
     threading.Thread(target=deliver_otp, args=(recipient_email, otp, subject), daemon=True).start()
-
-
-def should_provide_dev_otp():
-    """
-    Determines whether the generated OTP should be included in the API response.
-    Returns True by default on Render / demo deployments so voters are never locked out
-    by cloud SMTP firewall restrictions.
-    Can be explicitly disabled in production by setting ALLOW_DEV_OTP=False in Render env.
-    """
-    allow = os.environ.get('ALLOW_DEV_OTP', 'True').lower() in ('true', '1', 't')
-    if allow:
-        return True
-    if settings.DEBUG:
-        return True
-    return False
