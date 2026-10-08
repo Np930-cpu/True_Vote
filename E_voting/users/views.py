@@ -504,3 +504,77 @@ def delete_voter(request, voter_id):
     voter.delete()
     return Response({'message': 'Voter and biometric data deleted successfully'})
 
+
+@api_view(['POST'])
+def forgot_password(request):
+    email = (request.data.get('email') or '').strip()
+    if not email:
+        return Response({'error': 'Email is required'}, status=400)
+
+    try:
+        user = Voters.objects.get(email_id=email)
+    except Voters.DoesNotExist:
+        return Response({'error': 'No voter account found with this email address'}, status=404)
+
+    otp = f"{secrets.randbelow(900000) + 100000}"
+    user.otp = otp
+    user.otp_created_at = timezone.now()
+    user.save()
+
+    email_sent = False
+    try:
+        send_mail(
+            'TrueVote — Password Reset Code',
+            f'Your password reset OTP is {otp}. This code is valid for 10 minutes.',
+            settings.EMAIL_HOST_USER or 'noreply@truevote.app',
+            [user.email_id],
+            fail_silently=False
+        )
+        email_sent = True
+    except Exception as e:
+        print(f"[TrueVote] Password reset email failed: {e}")
+
+    if email_sent or not settings.DEBUG:
+        return Response({'message': f'OTP sent to {email}'})
+    else:
+        return Response({
+            'message': f'OTP sent to {email}',
+            'dev_otp': otp,
+            'warning': 'Email delivery failed; dev OTP provided'
+        })
+
+
+@api_view(['POST'])
+def reset_password(request):
+    email = (request.data.get('email') or '').strip()
+    otp = (request.data.get('otp') or '').strip()
+    new_password = request.data.get('new_password') or ''
+
+    if not email or not otp or not new_password:
+        return Response({'error': 'Email, OTP, and new password are required'}, status=400)
+
+    if len(new_password) < 6:
+        return Response({'error': 'Password must be at least 6 characters long'}, status=400)
+
+    try:
+        user = Voters.objects.get(email_id=email)
+    except Voters.DoesNotExist:
+        return Response({'error': 'Account not found'}, status=404)
+
+    if user.otp != str(otp):
+        return Response({'error': 'Invalid OTP code'}, status=400)
+
+    if user.otp_created_at and timezone.now() > user.otp_created_at + timedelta(minutes=10):
+        user.otp = None
+        user.otp_created_at = None
+        user.save()
+        return Response({'error': 'OTP has expired. Please request a new one.'}, status=400)
+
+    user.set_password(new_password)
+    user.otp = None
+    user.otp_created_at = None
+    user.save()
+
+    return Response({'message': 'Password has been successfully reset'})
+
+
