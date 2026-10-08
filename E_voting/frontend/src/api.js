@@ -1,11 +1,20 @@
 import axios from 'axios';
 
-// Get backend URL from Vite environment or localStorage fallback
+// Get backend URL from Vite environment, localStorage, or default production Render host
 export const getBaseURL = () => {
   const envUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  if (envUrl) return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+
   const storedUrl = typeof window !== 'undefined' ? (localStorage.getItem('VITE_API_BASE_URL') || '').trim() : '';
-  const chosen = envUrl || storedUrl;
-  return chosen.endsWith('/') ? chosen.slice(0, -1) : chosen;
+  if (storedUrl) return storedUrl.endsWith('/') ? storedUrl.slice(0, -1) : storedUrl;
+
+  // When deployed live (e.g. on Vercel), default to the live Render backend
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://truevote-backend-o5th.onrender.com';
+  }
+
+  // Local development fallback (Vite proxy forwards to http://127.0.0.1:8000)
+  return '';
 };
 
 // Allow updating the backend URL at runtime without needing a frontend rebuild
