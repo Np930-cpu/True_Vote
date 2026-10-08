@@ -151,6 +151,8 @@ else:
         'https://*.vercel.app',
         'http://localhost:5173',
         'http://127.0.0.1:5173',
+        'https://localhost:5173',
+        'https://127.0.0.1:5173',
     ]
 
 # Production Security Headers (active when DEBUG=False)
