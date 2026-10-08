@@ -60,9 +60,11 @@ class Command(BaseCommand):
             # 3. Create Fresh Elections
             today = date.today()
 
-            # Election 1: Active Election (Ready for live voting)
+            # Election 1: Active General Election
             election_active = Election.objects.create(
                 name="General Parliamentary Election 2026",
+                category="general",
+                organization="National Electoral Commission",
                 description=(
                     "National election to elect members of parliament and executive administration. "
                     "Voters cast encrypted ballots secured by biometric verification and immutable blockchain records."
@@ -102,9 +104,11 @@ class Command(BaseCommand):
                 ),
             ]
 
-            # Election 2: Upcoming Election
+            # Election 2: Upcoming Local Election
             election_upcoming = Election.objects.create(
                 name="Metropolitan Municipal Corporation Election 2026",
+                category="local",
+                organization="Metropolitan Municipal Council",
                 description=(
                     "Civic council election for mayoral and ward representatives overseeing urban infrastructure, "
                     "sanitation, and citizen services."
@@ -137,9 +141,65 @@ class Command(BaseCommand):
                 ),
             ]
 
-            # Election 3: Completed / Ended Election (With vote history & blockchain blocks)
+            # Election 3: Active School Council Election
+            election_school = Election.objects.create(
+                name="Senior High Student Council President 2026",
+                category="school",
+                organization="Greenwood International School",
+                description=(
+                    "Annual high school leadership election deciding head prefect, school sports leads, and academic council representatives."
+                ),
+                start_date=today - timedelta(days=2),
+                end_date=today + timedelta(days=12),
+            )
+
+            Candidate.objects.create(
+                election=election_school,
+                name="Aryan Khurana",
+                party="Blue House Alliance",
+                symbol="🦅",
+                manifesto="More inter-school sports events, student lounge upgrades, and peer tutoring programs.",
+            )
+            Candidate.objects.create(
+                election=election_school,
+                name="Tara Deshmukh",
+                party="Red Phoenix Slate",
+                symbol="🔥",
+                manifesto="Longer break times, eco-friendly school cafeteria, and dedicated science club laboratory hours.",
+            )
+
+            # Election 4: Active College / Club Election
+            election_club = Election.objects.create(
+                name="Robotics & Coding Society Lead 2026",
+                category="club",
+                organization="Apex Institute of Technology",
+                description=(
+                    "Tech society presidential election for organizing annual hackathons, robotics bootcamps, and workshop funding."
+                ),
+                start_date=today - timedelta(days=1),
+                end_date=today + timedelta(days=10),
+            )
+
+            Candidate.objects.create(
+                election=election_club,
+                name="Zoya Akhtar",
+                party="DevOps & AI Slate",
+                symbol="💻",
+                manifesto="Annual 48-hour inter-college hackathon, cloud computing credits for all members, and open-source incubator.",
+            )
+            Candidate.objects.create(
+                election=election_club,
+                name="Karan Malhotra",
+                party="Hardware Innovators",
+                symbol="⚙️",
+                manifesto="Free 3D-printer access, autonomous drone racing team sponsorship, and industry guest lectures.",
+            )
+
+            # Election 5: Completed College Election (With vote history & blockchain blocks)
             election_ended = Election.objects.create(
-                name="Campus Student Council Election 2026",
+                name="Campus Student Council Election 2025",
+                category="college",
+                organization="Apex University",
                 description=(
                     "Annual university student council leadership election deciding student welfare, clubs, and campus governance."
                 ),
@@ -162,7 +222,7 @@ class Command(BaseCommand):
                 manifesto="Industry internship tie-ups, research grant sponsorships, and upgraded sports facilities.",
             )
 
-            self.stdout.write(self.style.SUCCESS("Created 3 elections with 9 candidates."))
+            self.stdout.write(self.style.SUCCESS("Created 5 elections across College, School, Club, Local, and General categories."))
 
             # 4. Create fresh verified sample voters
             sample_voters_data = [

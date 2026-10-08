@@ -9,6 +9,7 @@ import Register from './pages/Register';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import Elections from './pages/Elections';
+import CreateElection from './pages/CreateElection';
 import Vote from './pages/Vote';
 import Results from './pages/Results';
 import Blockchain from './pages/Blockchain';
@@ -41,6 +42,7 @@ function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
         <Route path="/elections" element={<VoterRoute><Elections /></VoterRoute>} />
+        <Route path="/create-election" element={<VoterRoute><CreateElection /></VoterRoute>} />
         <Route path="/vote" element={<VoterRoute><Vote /></VoterRoute>} />
         <Route path="/results/:id" element={<VoterRoute><Results /></VoterRoute>} />
         <Route path="/results" element={<VoterRoute><Results /></VoterRoute>} />

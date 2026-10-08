@@ -11,6 +11,7 @@ export default function Navbar() {
 
   const voterLinks = [
     { to: '/elections', label: 'Elections' },
+    { to: '/create-election', label: '+ Create Election' },
     { to: '/results', label: 'Results' },
     { to: '/blockchain', label: 'Blockchain' },
     { to: '/profile', label: 'Profile' },

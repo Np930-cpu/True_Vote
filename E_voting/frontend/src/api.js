@@ -44,9 +44,10 @@ export const saveFaceFramesBatch = (data) => API.post('/api/face/save-frames-bat
 export const faceLogin = () => API.get('/api/face/login-face/');
 export const recognizeFrame = (data) => API.post('/api/face/recognize-frame/', data);
 
-export const listElections = () => API.get('/api/elections/election/');
+export const listElections = (params = {}) => API.get('/api/elections/election/', { params });
 export const createElection = (data) => API.post('/api/elections/election/create/', data);
-export const listCandidates = () => API.get('/api/elections/candidate/');
+export const deleteElection = (id) => API.delete(`/api/elections/election/${id}/delete/`);
+export const listCandidates = (electionId) => API.get('/api/elections/candidate/', { params: electionId ? { election: electionId } : {} });
 export const registerCandidate = (data) => API.post('/api/elections/candidate/register/', data);
 
 export const castVote = (data) => API.post('/api/votes/vote/', data);
