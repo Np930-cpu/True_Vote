@@ -127,6 +127,14 @@ SIMPLE_JWT = {
 
 AUTH_USER_MODEL = 'users.Voters'
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'truevote_cache_table',
+        'TIMEOUT': 3600,
+    }
+}
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
@@ -134,6 +142,10 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_TIMEOUT = 5
+
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
+ALLOW_DEV_OTP = os.environ.get('ALLOW_DEV_OTP', 'True').lower() in ('true', '1', 't')
 
 cors_allow_all = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True').lower() in ('true', '1', 't')
 CORS_ALLOW_ALL_ORIGINS = cors_allow_all

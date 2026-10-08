@@ -15,28 +15,7 @@ from django.conf import settings
 from .models import Voters
 
 
-def send_otp_email_async(recipient_email, otp, subject='TrueVote — Verification OTP'):
-    """Send OTP email in background thread so HTTP requests never block or time out."""
-    def _deliver():
-        if not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
-            print(f"[TrueVote] ⚠️ SMTP skipped (no credentials). Recipient: {recipient_email}, OTP: {otp}")
-            return
-        try:
-            send_mail(
-                subject,
-                f'Your OTP is {otp}. It expires in 2 minutes.',
-                settings.EMAIL_HOST_USER or 'noreply@truevote.app',
-                [recipient_email],
-                fail_silently=False
-            )
-            print(f"[TrueVote] ✅ OTP delivered via email to {recipient_email}")
-        except Exception as e:
-            print(f"[TrueVote] ⚠️ SMTP delivery failed to {recipient_email}: {e}")
-            print(f"==================================================")
-            print(f"  🔐 FALLBACK OTP FOR {recipient_email}: {otp}")
-            print(f"==================================================")
-
-    threading.Thread(target=_deliver, daemon=True).start()
+from .email_service import send_otp_email_async, should_provide_dev_otp
 
 
 @api_view(['POST'])
@@ -93,8 +72,9 @@ def send_otp(request):
             send_otp_email_async(target_email, otp, 'TrueVote — Email Verification OTP')
 
             resp = {'message': f'OTP sent to {target_email}'}
-            if settings.DEBUG or not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
+            if should_provide_dev_otp():
                 resp['dev_otp'] = otp
+                resp['message'] = f'OTP sent to {target_email}. Verification code: {otp}'
             return Response(resp)
 
     # Fallback for existing users
@@ -114,8 +94,9 @@ def send_otp(request):
     send_otp_email_async(user.email_id, otp, 'TrueVote — Email Verification OTP')
 
     resp = {'message': f'OTP sent to {user.email_id}'}
-    if settings.DEBUG or not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
+    if should_provide_dev_otp():
         resp['dev_otp'] = otp
+        resp['message'] = f'OTP sent to {user.email_id}. Verification code: {otp}'
     return Response(resp)
 
 
@@ -242,8 +223,9 @@ def send_login_otp(request):
     send_otp_email_async(user.email_id, otp, 'TrueVote — Login OTP')
 
     resp = {'message': f'OTP sent to {user.email_id}'}
-    if settings.DEBUG or not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
+    if should_provide_dev_otp():
         resp['dev_otp'] = otp
+        resp['message'] = f'OTP sent to {user.email_id}. Verification code: {otp}'
     return Response(resp)
 
 
@@ -484,8 +466,9 @@ def forgot_password(request):
     send_otp_email_async(user.email_id, otp, 'TrueVote — Password Reset Code')
 
     resp = {'message': f'OTP sent to {email}'}
-    if settings.DEBUG or not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
+    if should_provide_dev_otp():
         resp['dev_otp'] = otp
+        resp['message'] = f'OTP sent to {email}. Reset code: {otp}'
     return Response(resp)
 
 

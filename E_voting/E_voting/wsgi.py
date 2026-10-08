@@ -14,6 +14,12 @@ try:
     print("[TrueVote WSGI] Migrations successfully applied.")
 
     try:
+        call_command('createcachetable')
+        print("[TrueVote WSGI] Cache table initialized.")
+    except Exception as cache_err:
+        print(f"[TrueVote WSGI] Cache table note: {cache_err}")
+
+    try:
         call_command('init_admin')
         print("[TrueVote WSGI] Admin user initialized.")
     except Exception as admin_err:

@@ -16,8 +16,13 @@ export default function ForgotPassword() {
     e.preventDefault();
     setLoading(true); setMsg({});
     try {
-      await forgotPassword({ email });
-      setMsg({ type: 'success', text: `OTP sent to ${email}` });
+      const res = await forgotPassword({ email });
+      if (res.data?.dev_otp) {
+        setOtp(res.data.dev_otp);
+        setMsg({ type: 'success', text: res.data.message || `Code: ${res.data.dev_otp}` });
+      } else {
+        setMsg({ type: 'success', text: `OTP sent to ${email}` });
+      }
       setStep(2);
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.error || 'Failed to send OTP.' });

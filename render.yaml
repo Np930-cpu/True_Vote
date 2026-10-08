@@ -3,8 +3,8 @@ services:
     name: truevote-backend
     runtime: python
     rootDir: E_voting
-    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate && python manage.py init_admin
-    startCommand: python manage.py migrate && python manage.py init_admin && gunicorn E_voting.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate && python manage.py createcachetable && python manage.py init_admin
+    startCommand: python manage.py migrate && python manage.py createcachetable && python manage.py init_admin && gunicorn E_voting.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
     envVars:
       - key: DEBUG
         value: "False"
@@ -15,6 +15,12 @@ services:
       - key: CSRF_TRUSTED_ORIGINS
         value: "https://*.vercel.app,https://*.onrender.com"
       - key: DATABASE_URL
+        sync: false
+      - key: ALLOW_DEV_OTP
+        value: "True"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: BREVO_API_KEY
         sync: false
       - key: EMAIL_HOST_USER
         sync: false

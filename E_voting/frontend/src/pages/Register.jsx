@@ -153,6 +153,20 @@ export default function Register() {
                   style={{ fontSize: '1.6rem', letterSpacing: '0.6rem', textAlign: 'center', fontFamily: 'monospace' }}
                 />
               </div>
+              {otp && (
+                <div style={{
+                  background: 'rgba(37,99,235,0.08)',
+                  border: '1px solid rgba(37,99,235,0.2)',
+                  borderRadius: 'var(--r-sm)',
+                  padding: '0.6rem 0.8rem',
+                  marginBottom: '1rem',
+                  fontSize: '0.82rem',
+                  color: 'var(--blue)',
+                  textAlign: 'center'
+                }}>
+                  Verification Code: <strong style={{ letterSpacing: '2px' }}>{otp}</strong> (auto-filled)
+                </div>
+              )}
               <button className="btn btn-primary btn-full" disabled={loading} style={{ marginBottom: '0.75rem' }}>
                 {loading ? 'Verifying…' : 'Verify Code'}
               </button>

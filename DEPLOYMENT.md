@@ -49,8 +49,18 @@ You can get a free managed PostgreSQL database from **[Neon.tech](https://neon.t
    - `CORS_ALLOW_ALL_ORIGINS`: `False`
    - `CORS_ALLOWED_ORIGINS`: `https://your-frontend.vercel.app`
    - `CSRF_TRUSTED_ORIGINS`: `https://your-frontend.vercel.app,https://truevote-api.onrender.com`
-   - `EMAIL_HOST_USER`: *(Your Gmail address for OTPs)*
+   - `ALLOW_DEV_OTP`: `True` *(Ensures OTP is returned in API response and auto-filled so voters are never blocked)*
+   - `RESEND_API_KEY`: *(Optional: Free API key from [resend.com](https://resend.com) for real HTTPS email delivery on Render Free Tier)*
+   - `BREVO_API_KEY`: *(Optional: Free API key from [brevo.com](https://brevo.com) for 300 free emails/day over HTTPS)*
+   - `EMAIL_HOST_USER`: *(Your Gmail address for OTPs when running locally or on paid plan)*
    - `EMAIL_HOST_PASSWORD`: *(Your 16-character Google App Password)*
+
+> [!NOTE]
+> **Email Delivery on Render Free Tier**:
+> Render Free Tier blocks outbound SMTP traffic (ports 25, 465, and 587) to prevent spam.
+> To receive real emails on Render free tier, simply set `RESEND_API_KEY` or `BREVO_API_KEY` (which send over HTTPS port 443).
+> If no email API is configured, `ALLOW_DEV_OTP=True` automatically displays and auto-fills the verification code directly in the registration/login form so users are never stuck.
+
 5. Click **Create Web Service**.
 6. **Automatic Migration & Initial Seeding**:
    - The backend is configured to **automatically run migrations, initialize the admin account (`Admin` / `admin123`), and populate initial elections** directly inside `wsgi.py` on container startup!
