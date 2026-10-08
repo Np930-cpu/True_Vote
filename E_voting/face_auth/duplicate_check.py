@@ -4,6 +4,9 @@ import json
 import numpy as np
 
 
+from .cascade_loader import get_face_cascade
+
+
 def check_face_duplicate(new_user_id, threshold=50):
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     dataset_path = os.path.join(BASE_DIR, "face_auth", "dataset")
@@ -32,9 +35,7 @@ def check_face_duplicate(new_user_id, threshold=50):
     if not os.path.isdir(new_user_path):
         return False, None
 
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    )
+    face_cascade = get_face_cascade()
 
     for img_file in os.listdir(new_user_path):
         img_path = os.path.join(new_user_path, img_file)

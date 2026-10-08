@@ -1,5 +1,6 @@
 import cv2
 import os
+from .cascade_loader import get_face_cascade
 
 def capture_faces(user_id):
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -13,9 +14,7 @@ def capture_faces(user_id):
         print(" Camera not accessible")
         return
 
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    )
+    face_cascade = get_face_cascade()
 
     count = 0
 

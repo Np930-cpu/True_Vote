@@ -2,6 +2,8 @@ import cv2
 import os
 import json
 
+from .cascade_loader import get_face_cascade
+
 def recognize_face():
     model = cv2.face.LBPHFaceRecognizer_create()
 
@@ -27,9 +29,7 @@ def recognize_face():
         print(" Camera not accessible")
         return False
 
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    )
+    face_cascade = get_face_cascade()
 
     success_count = 0
     required_success = 3  # Reduced from 5 — faster verification

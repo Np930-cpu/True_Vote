@@ -44,8 +44,9 @@ vote_db_backup.sql
 face_auth/dataset/*
 **/face_auth/dataset/*
 !face_auth/dataset/.gitkeep
-face_auth/model/face_model.yml
-**/face_auth/model/face_model.yml
+face_auth/model/*
+**/face_auth/model/*
+!face_auth/model/.gitkeep
 
 # Static & Media uploads in production
 staticfiles/

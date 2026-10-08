@@ -68,31 +68,46 @@ export default function FaceVerify({ expectedUserId, onSuccess, onError }) {
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+    canvas.width = vw;
+    canvas.height = vh;
+
     const ctx = canvas.getContext('2d');
 
     // Helper: check if a frame is mostly black (camera not ready)
     const isBlackFrame = () => {
-      const sample = ctx.getImageData(canvas.width / 2 - 20, canvas.height / 2 - 20, 40, 40).data;
-      let total = 0;
-      for (let i = 0; i < sample.length; i += 4) total += sample[i] + sample[i + 1] + sample[i + 2];
-      return total / (sample.length / 4) < 15;
+      try {
+        const sample = ctx.getImageData(Math.floor(vw / 2 - 20), Math.floor(vh / 2 - 20), 40, 40).data;
+        let total = 0;
+        for (let i = 0; i < sample.length; i += 4) total += sample[i] + sample[i + 1] + sample[i + 2];
+        return total / (sample.length / 4) < 12;
+      } catch {
+        return false;
+      }
     };
 
     let attempts = 0;
     const maxAttempts = 15;
+    let skipped = 0;
 
     while (attempts < maxAttempts) {
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 450));
 
       ctx.save();
       ctx.scale(-1, 1);
-      ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, -vw, 0, vw, vh);
       ctx.restore();
 
-      // Skip black frames silently
-      if (isBlackFrame()) continue;
+      // Skip black frames silently during sensor warm-up (up to 5 skips)
+      if (isBlackFrame() && skipped < 5) {
+        skipped++;
+        continue;
+      }
 
-      const frame = canvas.toDataURL('image/jpeg', 0.92);
+      const frame = canvas.toDataURL('image/jpeg', 0.90);
 
       try {
         const res = await recognizeFrame({ frame });

@@ -74,27 +74,42 @@ export default function FaceCapture({ userId, onSuccess, onError }) {
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+    canvas.width = vw;
+    canvas.height = vh;
+
     const ctx = canvas.getContext('2d');
     const frames = [];
 
     // Helper: check if a frame is mostly black (camera not ready)
     const isBlackFrame = () => {
-      const sample = ctx.getImageData(canvas.width / 2 - 20, canvas.height / 2 - 20, 40, 40).data;
-      let total = 0;
-      for (let i = 0; i < sample.length; i += 4) total += sample[i] + sample[i + 1] + sample[i + 2];
-      return total / (sample.length / 4) < 15; // avg brightness < 15 = black
+      try {
+        const sample = ctx.getImageData(Math.floor(vw / 2 - 20), Math.floor(vh / 2 - 20), 40, 40).data;
+        let total = 0;
+        for (let i = 0; i < sample.length; i += 4) total += sample[i] + sample[i + 1] + sample[i + 2];
+        return total / (sample.length / 4) < 12; // avg brightness < 12 = black
+      } catch {
+        return false;
+      }
     };
 
+    let skipped = 0;
     await new Promise((resolve) => {
       let count = 0;
       intervalRef.current = setInterval(() => {
         ctx.save();
         ctx.scale(-1, 1);
-        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+        ctx.drawImage(video, -vw, 0, vw, vh);
         ctx.restore();
 
-        // Skip black frames — camera still warming up
-        if (isBlackFrame()) return;
+        // Skip black frames during sensor warm-up (up to 8 skips max)
+        if (isBlackFrame() && skipped < 8) {
+          skipped++;
+          return;
+        }
 
         const frame = canvas.toDataURL('image/jpeg', 0.88);
         frames.push(frame);

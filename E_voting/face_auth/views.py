@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from .train import train_model
 from .recognize import recognize_face
 from .duplicate_check import check_face_duplicate
+from .cascade_loader import get_face_cascade
 
 
 @api_view(['POST'])
@@ -24,13 +25,16 @@ def save_face_frames_batch(request):
     labels_path = os.path.join(BASE_DIR, 'face_auth', 'model', 'labels.json')
     save_path   = os.path.join(BASE_DIR, 'face_auth', 'dataset', str(user_id))
 
-    # Block if this voter already has a registered face dataset
-    if os.path.isdir(save_path) and len(os.listdir(save_path)) > 0:
+    # Block only if this voter has already completed full registration
+    from users.models import Voters
+    if Voters.objects.filter(voter_id=user_id, is_verified=True).exists():
         return Response({'error': 'Face already registered for this voter ID.'}, status=400)
 
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    )
+    # Reset any partial dataset from previous incomplete attempts
+    if os.path.isdir(save_path):
+        shutil.rmtree(save_path, ignore_errors=True)
+
+    face_cascade = get_face_cascade()
 
     existing_model = None
     label_map = {}
@@ -56,7 +60,7 @@ def save_face_frames_batch(request):
                 continue
 
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, 1.2, 4, minSize=(80, 80))
+            faces = face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(50, 50))
             if len(faces) == 0:
                 continue
 
@@ -86,7 +90,7 @@ def save_face_frames_batch(request):
         except Exception:
             continue
 
-    if saved < 5:
+    if saved < 3:
         shutil.rmtree(save_path, ignore_errors=True)
         return Response({'error': f'Only {saved} valid face frames captured. Please ensure good lighting and face the camera directly.'}, status=400)
 
@@ -114,10 +118,8 @@ def save_face_frame(request):
         return Response({'error': 'Invalid image data'}, status=400)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    )
-    faces = face_cascade.detectMultiScale(gray, 1.2, 4, minSize=(80, 80))
+    face_cascade = get_face_cascade()
+    faces = face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(50, 50))
 
     if len(faces) == 0:
         return Response({'error': 'No face detected in frame'}, status=400)
@@ -176,10 +178,8 @@ def recognize_from_frame(request):
         return Response({'error': 'Invalid image data'}, status=400)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    )
-    faces = face_cascade.detectMultiScale(gray, 1.2, 4, minSize=(60, 60))
+    face_cascade = get_face_cascade()
+    faces = face_cascade.detectMultiScale(gray, 1.1, 3, minSize=(50, 50))
 
     if len(faces) == 0:
         return Response({'error': 'No face detected'}, status=400)

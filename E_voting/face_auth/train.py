@@ -3,6 +3,8 @@ import cv2
 import os
 import numpy as np
 
+from .cascade_loader import get_face_cascade
+
 def train_model():
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -16,9 +18,7 @@ def train_model():
 
     label_id = 0
 
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    )
+    face_cascade = get_face_cascade()
 
     if not os.path.exists(dataset_path):
         print(" Dataset folder not found")
