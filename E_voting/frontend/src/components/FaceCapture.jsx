@@ -12,7 +12,6 @@ export default function FaceCapture({ userId, onSuccess, onError }) {
 
   const [phase, setPhase] = useState('idle');
   const [captured, setCaptured] = useState(0);
-  const [faceDetected, setFaceDetected] = useState(false);
   const [msg, setMsg] = useState('');
 
   const stopCamera = useCallback(() => {
@@ -120,7 +119,6 @@ export default function FaceCapture({ userId, onSuccess, onError }) {
     stopCamera();
     setPhase('idle');
     setCaptured(0);
-    setFaceDetected(false);
     setMsg('');
   };
 

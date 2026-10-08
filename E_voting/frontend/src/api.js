@@ -2,7 +2,9 @@ import axios from 'axios';
 
 // Use VITE_API_BASE_URL in production (e.g. on Vercel/Netlify pointing to Render backend)
 // In local development, leave unset so Vite dev server proxies /api and /blockchain to Django
-const API = axios.create({ baseURL: import.meta.env.VITE_API_BASE_URL || '' });
+const rawBaseURL = import.meta.env.VITE_API_BASE_URL || '';
+const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL.slice(0, -1) : rawBaseURL;
+const API = axios.create({ baseURL });
 
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('access');

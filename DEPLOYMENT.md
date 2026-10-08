@@ -60,19 +60,27 @@ You can get a free managed PostgreSQL database from **[Neon.tech](https://neon.t
 
 ---
 
-## 4. Step 3: Deploy Frontend (e.g. on Vercel / Netlify)
+## 4. Step 3: Deploy Frontend on Vercel
 
-### Deploying on [Vercel](https://vercel.com)
-1. In Vercel Dashboard, click **Add New...** -> **Project**.
-2. Import your GitHub repository.
-3. Configure the project:
-   - **Root Directory**: `E_voting/frontend`
-   - **Framework Preset**: `Vite`
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-4. In **Environment Variables**, add:
-   - `VITE_API_BASE_URL`: `https://truevote-api.onrender.com` *(Your live Render backend URL, without trailing slash)*
+The project is pre-configured with `vercel.json` files for seamless one-click Vercel deployment.
+
+### Method 1: Subfolder Import (Recommended)
+1. In the [Vercel Dashboard](https://vercel.com), click **Add New...** -> **Project**.
+2. Import your GitHub repository (`Np930-cpu/True_Vote` or your repo name).
+3. In the project setup screen:
+   - Click **Edit** next to **Root Directory** and select `E_voting/frontend`.
+   - **Framework Preset**: `Vite` (automatically detected).
+   - **Build Command**: `npm run build` (automatic).
+   - **Output Directory**: `dist` (automatic).
+4. Expand **Environment Variables** and add:
+   - `VITE_API_BASE_URL`: `https://truevote-api.onrender.com` *(Your live Django backend URL, without trailing slash)*
 5. Click **Deploy**.
+
+### Method 2: Root Repository Import
+If you do not change the Root Directory in Vercel, the root `vercel.json` will automatically build the frontend inside `E_voting/frontend` and serve `E_voting/frontend/dist` without extra configuration! Simply add `VITE_API_BASE_URL` in the Environment Variables and click **Deploy**.
+
+### SPA Routing & Assets
+Both `vercel.json` files contain rewrites (`/* -> /index.html`) so that React Router paths (`/login`, `/register`, `/elections`, `/vote`, `/admin/dashboard`) reload without 404 errors.
 
 > [!IMPORTANT]
 > **HTTPS Requirement for Face Recognition**:

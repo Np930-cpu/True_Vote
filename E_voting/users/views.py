@@ -7,7 +7,7 @@ from django.core.mail import send_mail
 from django.core.cache import cache
 from django.utils import timezone
 from datetime import timedelta
-import random
+import secrets
 from django.conf import settings
 from .models import Voters
 
@@ -57,7 +57,7 @@ def send_otp(request):
     if voter_id:
         pending = cache.get(f'pending_reg_{voter_id}')
         if pending:
-            otp = str(random.randint(100000, 999999))
+            otp = f"{secrets.randbelow(900000) + 100000}"
             pending['otp'] = otp
             pending['otp_created_at'] = timezone.now().isoformat()
             cache.set(f'pending_reg_{voter_id}', pending, timeout=3600)
@@ -79,7 +79,7 @@ def send_otp(request):
     except Voters.DoesNotExist:
         return Response({'error': 'User not found'}, status=404)
 
-    otp = str(random.randint(100000, 999999))
+    otp = f"{secrets.randbelow(900000) + 100000}"
     user.otp = otp
     user.otp_created_at = timezone.now()
     user.save()
@@ -209,7 +209,7 @@ def send_login_otp(request):
     if not face_registered:
         return Response({'error': 'Face not registered. Please complete registration first.'}, status=403)
 
-    otp = str(random.randint(100000, 999999))
+    otp = f"{secrets.randbelow(900000) + 100000}"
     user.otp = otp
     user.otp_created_at = timezone.now()
     user.save()

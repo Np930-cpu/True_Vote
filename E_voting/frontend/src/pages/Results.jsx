@@ -18,15 +18,14 @@ function DonutChart({ data, total }) {
     );
   }
 
-  let offset = 0;
-  const slices = data.map((d, i) => {
+  const slices = data.reduce((acc, d, i) => {
+    const prevOffset = acc.length > 0 ? acc[acc.length - 1].offset + acc[acc.length - 1].dash : 0;
     const pct = d.value / total;
     const dash = pct * circumference;
-    const gap  = circumference - dash;
-    const slice = { offset, dash, gap, color: COLORS[i % COLORS.length], name: d.name, value: d.value };
-    offset += dash;
-    return slice;
-  });
+    const gap = circumference - dash;
+    acc.push({ offset: prevOffset, dash, gap, color: COLORS[i % COLORS.length], name: d.name, value: d.value });
+    return acc;
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
