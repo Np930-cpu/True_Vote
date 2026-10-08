@@ -43,7 +43,7 @@ export default function Register() {
       let errorText = err.response?.data?.error || err.response?.data?.message;
       if (!errorText) {
         if (!err.response) {
-          errorText = 'Cannot connect to backend server. If deployed on Render, it may be waking up (wait 30s) or check VITE_API_BASE_URL on Vercel.';
+          errorText = 'Unable to connect to server. Please try again.';
         } else {
           errorText = 'Registration failed. Please check your details.';
         }

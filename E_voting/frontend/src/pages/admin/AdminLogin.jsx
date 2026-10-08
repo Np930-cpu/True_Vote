@@ -19,7 +19,7 @@ export default function AdminLogin() {
       loginAdmin();
       navigate('/admin/dashboard');
     } catch (err) {
-      const errorMsg = err.response?.data?.error || (!err.response ? 'Cannot connect to backend server. If deployed on Render, it may be waking up (wait 30s) or check VITE_API_BASE_URL on Vercel.' : 'Login failed.');
+      const errorMsg = err.response?.data?.error || (!err.response ? 'Unable to connect to server. Please try again.' : 'Login failed.');
       setMsg(errorMsg);
     }
     setLoading(false);

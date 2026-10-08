@@ -39,7 +39,7 @@ export default function Login() {
       let error = err.response?.data?.error || err.response?.data?.message;
       if (!error) {
         if (!err.response) {
-          error = 'Cannot connect to backend server. If deployed on Render, it may be waking up (wait 30s) or check VITE_API_BASE_URL on Vercel.';
+          error = 'Unable to connect to server. Please try again.';
         } else {
           error = 'Failed to send OTP.';
         }
