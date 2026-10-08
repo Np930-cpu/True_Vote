@@ -93,7 +93,10 @@ def send_otp(request):
             if not success:
                 return Response({'error': f'Failed to deliver OTP email: {msg}'}, status=400)
 
-            resp = {'message': f'OTP sent to {target_email}. Please check your email inbox (and Spam/Junk folder).'}
+            resp = {
+                'message': f'OTP sent to {target_email}. Please check your email inbox (and Spam/Junk folder).',
+                'delivery_provider': msg,
+            }
             return Response(resp)
 
     # Fallback for existing users
@@ -114,7 +117,10 @@ def send_otp(request):
     if not success:
         return Response({'error': f'Failed to deliver OTP email: {msg}'}, status=400)
 
-    resp = {'message': f'OTP sent to {user.email_id}. Please check your email inbox (and Spam/Junk folder).'}
+    resp = {
+        'message': f'OTP sent to {user.email_id}. Please check your email inbox (and Spam/Junk folder).',
+        'delivery_provider': msg,
+    }
     return Response(resp)
 
 
@@ -269,7 +275,10 @@ def send_login_otp(request):
     if not success:
         return Response({'error': f'Failed to deliver login OTP email: {msg}'}, status=400)
 
-    resp = {'message': f'OTP sent to {user.email_id}. Please check your email inbox (and Spam/Junk folder).'}
+    resp = {
+        'message': f'OTP sent to {user.email_id}. Please check your email inbox (and Spam/Junk folder).',
+        'delivery_provider': msg,
+    }
     return Response(resp)
 
 
